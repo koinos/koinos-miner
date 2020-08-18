@@ -10,25 +10,51 @@
 
 #define SAMPLE_INDICES 10
 
-struct bn primes[10];
-struct bn buffer_size;
+uint32_t primes[10];
+
+uint32_t bignum_mod_small( struct bn* b, uint32_t m )
+{
+   // Compute b % m
+   uint64_t tmp = 0;
+   size_t i;
+   for( int i=BN_ARRAY_SIZE-1; i>=0; i-- )
+   {
+      tmp = (tmp << 32) | b->array[i];
+      tmp %= m;
+   }
+   return (uint32_t) tmp;
+}
 
 void init_work_constants()
 {
-   bignum_from_int( primes,     0x0000fffd );
-   bignum_from_int( primes + 1, 0x0000fffb );
-   bignum_from_int( primes + 2, 0x0000fff7 );
-   bignum_from_int( primes + 3, 0x0000fff1 );
-   bignum_from_int( primes + 4, 0x0000ffef );
-   bignum_from_int( primes + 5, 0x0000ffe5 );
-   bignum_from_int( primes + 6, 0x0000ffdf );
-   bignum_from_int( primes + 7, 0x0000ffd9 );
-   bignum_from_int( primes + 8, 0x0000ffd3 );
-   bignum_from_int( primes + 9, 0x0000ffd1 );
+   size_t i;
 
-   bignum_from_int( &buffer_size, WORD_BUFFER_LENGTH - 1 ); // 0x0000FFFF
+   primes[0] = 0x0000fffd;
+   primes[1] = 0x0000fffb;
+   primes[2] = 0x0000fff7;
+   primes[3] = 0x0000fff1;
+   primes[4] = 0x0000ffef;
+   primes[5] = 0x0000ffe5;
+   primes[6] = 0x0000ffdf;
+   primes[7] = 0x0000ffd9;
+   primes[8] = 0x0000ffd3;
+   primes[9] = 0x0000ffd1;
 }
 
+struct work_data
+{
+   uint32_t x[10];
+};
+
+void init_work_data( struct work_data* wdata, struct bn* secured_struct_hash )
+{
+   size_t i;
+   struct bn x;
+   for( i=0; i<10; i++ )
+   {
+      wdata->x[i] = bignum_mod_small( secured_struct_hash, primes[i] );
+   }
+}
 
 struct secured_struct
 {
@@ -41,7 +67,6 @@ struct secured_struct
    //struct bn tip_percent;
 };
 
-
 void hash_secured_struct( struct bn* res, struct secured_struct* ss )
 {
    SHA3_CTX c;
@@ -52,49 +77,50 @@ void hash_secured_struct( struct bn* res, struct secured_struct* ss )
 }
 
 
-void find_and_xor_word( struct bn* result, struct bn* secured_struct_hash, struct bn* prime, struct bn* coefficients, struct bn* word_buffer )
+void find_and_xor_word( struct bn* result, uint32_t x, uint32_t* coefficients, struct bn* word_buffer )
 {
-   struct bn x, y, tmp;
-
-   bignum_mod( secured_struct_hash, prime, &x );      // x = secured_struct_hash % prime
-   bignum_mul( coefficients + 4, &x, &y );            // y = coefficients[4] * x
-   bignum_add( &y, coefficients + 3, &tmp );          // y += coefficients[3] (using tmp storage)
-   bignum_mul( &tmp, &x, &y );                        // y *= x
-   bignum_add( &y, coefficients + 2, &tmp );          // y += coefficients[2] (using tmp storage)
-   bignum_mul( &tmp, &x, &y );                        // y *= x
-   bignum_add( &y, coefficients + 1, &tmp );          // y += coefficients[1] (using tmp storage)
-   bignum_mul( &tmp, &x, &y );                        // y *= x
-   bignum_add( &y, coefficients, &tmp );              // y += coefficients[0] (using tmp storage)
-   bignum_mod( &tmp, &buffer_size, &y );              // y %= 0x0000ffff
-   unsigned int index = bignum_to_int( &y );
-   bignum_xor( result, word_buffer + index, result ); // result ^= w
+   uint64_t y = coefficients[4];
+   y *= x;
+   y += coefficients[3];
+   y %= WORD_BUFFER_LENGTH - 1;
+   y *= x;
+   y += coefficients[2];
+   y %= WORD_BUFFER_LENGTH - 1;
+   y *= x;
+   y += coefficients[1];
+   y %= WORD_BUFFER_LENGTH - 1;
+   y *= x;
+   y += coefficients[0];
+   y %= WORD_BUFFER_LENGTH - 1;
+   bignum_xor( result, word_buffer + y, result );
 }
 
 
 void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, struct bn* word_buffer )
 {
+   struct work_data wdata;
+   init_work_data( &wdata, secured_struct_hash );
+
    struct bn x;
    struct bn y;
    struct bn tmp;
 
    bignum_assign( result, secured_struct_hash ); // result = secured_struct_hash;
 
-   struct bn coefficients[5];
+   uint32_t coefficients[5];
 
    int i;
-   for( i = 0; i < sizeof(coefficients) / sizeof(struct bn); ++i )
+   for( i = 0; i < sizeof(coefficients) / sizeof(uint32_t); ++i )
    {
-      // coefficients[i] = (nonce % primes[i])+1
-      bignum_init( coefficients + i );
-      bignum_mod( nonce, primes + i, coefficients + i );
-      bignum_inc( coefficients + i );
+      coefficients[i] = 1 + bignum_mod_small( nonce, primes[i] );
    }
 
-   for( i = 0; i < sizeof(primes) / sizeof(struct bn); ++i )
+   for( i = 0; i < sizeof(primes) / sizeof(uint32_t); ++i )
    {
-      find_and_xor_word( result, secured_struct_hash, primes + i, coefficients, word_buffer );
+      find_and_xor_word( result, wdata.x[i], coefficients, word_buffer );
    }
 }
+
 
 
 int main( int argc, char** argv )
