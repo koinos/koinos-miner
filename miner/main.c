@@ -140,7 +140,7 @@ int main( int argc, char** argv )
    bignum_init( &ss.recent_eth_block_hash );
    bignum_init( &ss.target );
    bignum_dec( &ss.target );
-   bignum_rshift( &ss.target, &ss.target, 19 );
+   bignum_rshift( &ss.target, &ss.target, 20 );
    bignum_init( &ss.pow_height );
    //keccak_init( &c );
    //keccak_update( &c, "oo", 5 );
@@ -154,14 +154,45 @@ int main( int argc, char** argv )
    struct bn nonce;
    bignum_init( &nonce );
 
-   struct bn result;
+   struct bn result, t_nonce, t_result, s_nonce;
+   bool stop = false;
 
-   do
+   bignum_assign( &s_nonce, &nonce );
+
+
+   #pragma omp parallel private(t_nonce, t_result)
    {
-      bignum_inc( &nonce );
-      work( &result, &secured_struct_hash, &nonce, word_buffer );
-   } while( bignum_cmp( &result, &ss.target ) > 0 );
+      while( !stop )
+      {
+         #pragma omp critical
+         {
+            bignum_inc( &s_nonce );
+            bignum_assign( &t_nonce, &s_nonce );
+         }
 
+         work( &t_result, &secured_struct_hash, &t_nonce, word_buffer );
+
+         if( bignum_cmp( &t_result, &ss.target ) <= 0)
+         {
+            #pragma omp crticial
+            {
+               // Two threads could find a valid proof at the same time (unlikely, but possible).
+               // We want to return the more difficult proof
+               if( !stop )
+               {
+                  stop = true;
+                  bignum_assign( &result, &t_result );
+                  bignum_assign( &nonce, &t_nonce );
+               }
+               else if( bignum_cmp( &t_result, &result ) < 0 )
+               {
+                  bignum_assign( &result, &t_result );
+                  bignum_assign( &nonce, &t_nonce );
+               }
+            }
+         }
+      }
+   }
 
    bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
    printf( "Nonce: %s\n", bn_str );
