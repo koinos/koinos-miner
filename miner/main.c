@@ -15,6 +15,19 @@ struct bn buffer_size;
 
 uint32_t primes[10];
 
+uint32_t bignum_mod_small( struct bn* b, uint32_t m )
+{
+   // Compute b % m
+   uint64_t tmp = 0;
+   size_t i;
+   for( int i=BN_ARRAY_SIZE-1; i>=0; i-- )
+   {
+      tmp = (tmp << 32) | b->array[i];
+      tmp %= m;
+   }
+   return (uint32_t) tmp;
+}
+
 void init_work_constants()
 {
    size_t i;
@@ -93,9 +106,7 @@ void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, 
    for( i = 0; i < sizeof(coefficients) / sizeof(struct bn); ++i )
    {
       // coefficients[i] = (nonce % bn_primes[i])+1
-      bignum_init( coefficients + i );
-      bignum_mod( nonce, bn_primes + i, coefficients + i );
-      bignum_inc( coefficients + i );
+      bignum_from_int( coefficients+i , 1 + bignum_mod_small( nonce, primes[i] ) );
    }
 
    for( i = 0; i < sizeof(bn_primes) / sizeof(struct bn); ++i )
