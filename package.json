@@ -1,0 +1,26 @@
+{
+  "name": "koinos-miner",
+  "version": "1.0.0",
+  "description": "Mining application used to mint the KOIN ERC-20.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/open-orchard/koinos-miner.git"
+  },
+  "keywords": [],
+  "author": "OpenOrchard, Inc.",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/open-orchard/koinos-miner/issues"
+  },
+  "homepage": "https://github.com/open-orchard/koinos-miner#readme",
+  "dependencies": {
+    "commander": "^6.0.0",
+    "web3": "^1.2.11"
+  }
+}
