@@ -1,124 +1,171 @@
-#include <openssl/evp.h>
-
-//#include <cstdint>
-//#include <memory>
-//#include <iostream>
-//#include <sstream>
+#include "bn.h"
+#include "keccak256.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define WORD_BUFFER_BYTES 1 << 10 // 2 MB
-#define WORD_SIZE         1 << 5  // each word is 32 bytes (256 bit)
-#define WORD_BUFFER_SIZE  WORD_BUFFER_BYTES / WORD_SIZE
+#define WORD_BUFFER_BYTES  (2 << 20) // 2 MB
+#define WORD_BUFFER_LENGTH (WORD_BUFFER_BYTES / sizeof(struct bn))
 
 #define SAMPLE_INDICES 10
 
-const unsigned long index_padding[3] = { 0x0000000000000000, 0x0000000000000000, 0x0000000000000000 };
+struct bn primes[10];
+struct bn buffer_size;
 
-int to_hex_string( unsigned char* dest, unsigned char* n, int len )
+void init_work_constants()
 {
-   static const char hex[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+   bignum_from_int( primes,     0x0000fffd );
+   bignum_from_int( primes + 1, 0x0000fffb );
+   bignum_from_int( primes + 2, 0x0000fff7 );
+   bignum_from_int( primes + 3, 0x0000fff1 );
+   bignum_from_int( primes + 4, 0x0000ffef );
+   bignum_from_int( primes + 5, 0x0000ffe5 );
+   bignum_from_int( primes + 6, 0x0000ffdf );
+   bignum_from_int( primes + 7, 0x0000ffd9 );
+   bignum_from_int( primes + 8, 0x0000ffd3 );
+   bignum_from_int( primes + 9, 0x0000ffd1 );
 
-   for( int i = 0; i < len; i++ )
-   {
-      dest[2 * i]     = hex[(n[i] & 0xF0) >> 4];
-      dest[2 * i + 1] = hex[n[i] & 0x0F];
-   }
-
-   return len * 2;
+   bignum_from_int( &buffer_size, WORD_BUFFER_LENGTH - 1 ); // 0x0000FFFF
 }
 
-/**
- * Args:
- * seed block
- * recipient
- * work counter
- * tip address
- * tip percent
- */
+
+struct secured_struct
+{
+   struct bn miner;
+   struct bn recent_eth_block_number;
+   struct bn recent_eth_block_hash;
+   struct bn target;
+   struct bn pow_height;
+   //struct bn tip_recipient;
+   //struct bn tip_percent;
+};
+
+
+void hash_secured_struct( struct bn* res, struct secured_struct* ss )
+{
+   SHA3_CTX c;
+   keccak_init( &c );
+   keccak_update( &c, (unsigned char*)ss, sizeof(struct secured_struct) );
+   keccak_final( &c, (unsigned char*)res );
+   bignum_endian_swap( res );
+}
+
+
+void find_and_xor_word( struct bn* result, struct bn* secured_struct_hash, struct bn* prime, struct bn* coefficients, struct bn* word_buffer )
+{
+   struct bn x, y, tmp;
+
+   bignum_mod( secured_struct_hash, prime, &x );      // x = secured_struct_hash % prime
+   bignum_mul( coefficients + 4, &x, &y );            // y = coefficients[4] * x
+   bignum_add( &y, coefficients + 3, &tmp );          // y += coefficients[3] (using tmp storage)
+   bignum_mul( &tmp, &x, &y );                        // y *= x
+   bignum_add( &y, coefficients + 2, &tmp );          // y += coefficients[2] (using tmp storage)
+   bignum_mul( &tmp, &x, &y );                        // y *= x
+   bignum_add( &y, coefficients + 1, &tmp );          // y += coefficients[1] (using tmp storage)
+   bignum_mul( &tmp, &x, &y );                        // y *= x
+   bignum_add( &y, coefficients, &tmp );              // y += coefficients[0] (using tmp storage)
+   bignum_mod( &tmp, &buffer_size, &y );              // y %= 0x0000ffff
+   unsigned int index = bignum_to_int( &y );
+   bignum_xor( result, word_buffer + index, result ); // result ^= w
+}
+
+
+void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, struct bn* word_buffer )
+{
+   struct bn x;
+   struct bn y;
+   struct bn tmp;
+
+   bignum_assign( result, secured_struct_hash ); // result = secured_struct_hash;
+
+   struct bn coefficients[5];
+
+   int i;
+   for( i = 0; i < sizeof(coefficients) / sizeof(struct bn); ++i )
+   {
+      // coefficients[i] = (nonce % primes[i])+1
+      bignum_init( coefficients + i );
+      bignum_mod( nonce, primes + i, coefficients + i );
+      bignum_inc( coefficients + i );
+   }
+
+   for( i = 0; i < sizeof(primes) / sizeof(struct bn); ++i )
+   {
+      find_and_xor_word( result, secured_struct_hash, primes + i, coefficients, word_buffer );
+   }
+}
+
+
 int main( int argc, char** argv )
 {
-   // 256 bit seed
-   // SHA_256( "hello world" )
-   unsigned long seed[4] = { 0xB94D27B9934D3E08, 0xA52E52D7DA7DABFA, 0xC484EFE37A5380EE, 0x9088F7ACE2EFCDE9 };
+   struct bn* word_buffer = malloc( WORD_BUFFER_BYTES );
+   struct bn seed;
 
-   unsigned long* word_buffer = malloc( (WORD_BUFFER_BYTES) * sizeof(unsigned long));
+   char bn_str[78];
 
-   EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
-   const EVP_MD *md = EVP_sha256();
-   unsigned int md_len;
+   SHA3_CTX c;
+
+   keccak_init( &c );
+   keccak_update( &c, (unsigned char*)"This is the seed.", 17 );
+   keccak_final( &c, (unsigned char*)&seed );
+
+   unsigned char index_padding[24];
+   memset( index_padding, 0, sizeof(index_padding) );
+
+   struct bn bn_i;
 
    // Procedurally generate word buffer w[i] from a seed
    // Each word buffer element is computed by w[i] = H(seed, i)
-   for( unsigned long i = 0; i < WORD_BUFFER_SIZE; i++ )
+   for( unsigned long i = 0; i < WORD_BUFFER_LENGTH; i++ )
    {
-      EVP_DigestInit_ex( mdctx, md, NULL );
-      EVP_DigestUpdate( mdctx, seed, sizeof( seed ) );
-      EVP_DigestUpdate( mdctx, index_padding, sizeof( index_padding ) );
-      EVP_DigestUpdate( mdctx, &i, sizeof( i ) );
-      EVP_DigestFinal_ex( mdctx, (unsigned char*)(word_buffer + i), &md_len );
-      // assert md_len == 32
+      keccak_init( &c );
+      keccak_update( &c, (unsigned char*)&seed, sizeof(seed) );
+      bignum_from_int( &bn_i, i );
+      bignum_endian_swap( &bn_i );
+      keccak_update( &c, (unsigned char*)&bn_i, sizeof(struct bn) );
+      keccak_final( &c, (unsigned char*)(word_buffer + i) );
+      bignum_endian_swap( word_buffer + i );
    }
 
-   unsigned long miner_counter = 0;
-   unsigned long tip_percent = 5;
-   unsigned long difficulty_bits = 20;
-   unsigned long padding = 0;
+   init_work_constants();
 
-   unsigned long nonce[4];
-   memset( nonce, 0, sizeof(nonce) );
+   struct secured_struct ss;
 
-   // Recipient address
-   unsigned long recepient[4] = { 0xCE1695DA058EFB9E, 0x08064D5291E3FE1B, 0xA1657652045C2311, 0x1FB1A55472096246 };
+   keccak_init( &c );
+   keccak_update( &c, (unsigned char*)"miner", 5 );
+   keccak_final( &c, (unsigned char*)&ss.miner );
+   bignum_endian_swap( &ss.miner );
+   bignum_init( &ss.recent_eth_block_number );
+   bignum_init( &ss.recent_eth_block_hash );
+   bignum_init( &ss.target );
+   bignum_dec( &ss.target );
+   bignum_rshift( &ss.target, &ss.target, 19 );
+   bignum_init( &ss.pow_height );
+   //keccak_init( &c );
+   //keccak_update( &c, "oo", 5 );
+   //keccak_final( &c, (unsigned char*)&ss.tip_recipient );
+   //bignum_endian_swap( &ss.tip_recipient );
+   //bignum_from_int( &ss.tip_percent, 5 );
 
-   unsigned long tip_dest[4] =  { 0x15911486D0C4C2C3, 0x52517317F05646F6, 0xB48D21F3DAE8F05B, 0xCEF11652728FF680 }; // Tip address
+   struct bn secured_struct_hash;
+   hash_secured_struct( &secured_struct_hash, &ss );
 
-   unsigned long h[4];
-   memset( h, 0, sizeof(h) );
+   struct bn nonce;
+   bignum_init( &nonce );
 
-   unsigned long result[4];
-   memset( result, 0, sizeof(result) );
-
-   unsigned long index_buffer[4];
-   memset( index_buffer, 0, sizeof(index_buffer) );
+   struct bn result;
 
    do
    {
-      nonce[3]++;
+      bignum_inc( &nonce );
+      work( &result, &secured_struct_hash, &nonce, word_buffer );
+   } while( bignum_cmp( &result, &ss.target ) > 0 );
 
-      for( unsigned long i = 0; i < SAMPLE_INDICES; i++ )
-      {
-         EVP_DigestInit_ex( mdctx, md, NULL );
-         EVP_DigestUpdate( mdctx, &miner_counter, sizeof( miner_counter ) );
-         EVP_DigestUpdate( mdctx, &tip_percent, sizeof( tip_percent ) );
-         EVP_DigestUpdate( mdctx, &difficulty_bits, sizeof( difficulty_bits ) );
-         EVP_DigestUpdate( mdctx, &i, sizeof( i ) );
-         EVP_DigestUpdate( mdctx, nonce, sizeof( nonce ) );
-         EVP_DigestUpdate( mdctx, recepient, sizeof( recepient ) );
-         EVP_DigestUpdate( mdctx, tip_dest, sizeof( tip_dest ) );
-         EVP_DigestUpdate( mdctx, &i, sizeof(i) );
-         EVP_DigestFinal_ex( mdctx, (unsigned char*)h, &md_len );
 
-         EVP_DigestInit_ex( mdctx, md, NULL );
-         EVP_DigestUpdate( mdctx, h, sizeof(h) );
-         EVP_DigestFinal_ex( mdctx, (unsigned char*)index_buffer, &md_len );
+   bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
+   printf( "Nonce: %s\n", bn_str );
 
-         unsigned long index = index_buffer[0] % WORD_BUFFER_SIZE;
-
-         for( unsigned long j = 0; j < 4; j++ )
-         {
-            result[j] = result[j] ^ word_buffer[index + j] ^ h[j];
-         }
-      }
-   } while( result[0] > 0x0000FFFFFFFFFFFF );
-
-   printf( "%lu\n", nonce[3] );
-
-   unsigned char hex_str[66];
-   to_hex_string( hex_str, (unsigned char*)result, sizeof(result) );
-   hex_str[64] = '\n';
-   hex_str[65] = 0;
-   printf( "%s", hex_str );
+   bignum_to_string( &result, bn_str, sizeof(bn_str), true );
+   printf( "Proof: 0x%s\n", bn_str );
 }
