@@ -13,18 +13,27 @@
 struct bn bn_primes[10];
 struct bn buffer_size;
 
+uint32_t primes[10];
+
 void init_work_constants()
 {
-   bignum_from_int( bn_primes,     0x0000fffd );
-   bignum_from_int( bn_primes + 1, 0x0000fffb );
-   bignum_from_int( bn_primes + 2, 0x0000fff7 );
-   bignum_from_int( bn_primes + 3, 0x0000fff1 );
-   bignum_from_int( bn_primes + 4, 0x0000ffef );
-   bignum_from_int( bn_primes + 5, 0x0000ffe5 );
-   bignum_from_int( bn_primes + 6, 0x0000ffdf );
-   bignum_from_int( bn_primes + 7, 0x0000ffd9 );
-   bignum_from_int( bn_primes + 8, 0x0000ffd3 );
-   bignum_from_int( bn_primes + 9, 0x0000ffd1 );
+   size_t i;
+
+   primes[0] = 0x0000fffd;
+   primes[1] = 0x0000fffb;
+   primes[2] = 0x0000fff7;
+   primes[3] = 0x0000fff1;
+   primes[4] = 0x0000ffef;
+   primes[5] = 0x0000ffe5;
+   primes[6] = 0x0000ffdf;
+   primes[7] = 0x0000ffd9;
+   primes[8] = 0x0000ffd3;
+   primes[9] = 0x0000ffd1;
+
+   for( i=0; i<10; i++ )
+   {
+      bignum_from_int( bn_primes+i, primes[i] );
+   }
 
    bignum_from_int( &buffer_size, WORD_BUFFER_LENGTH - 1 ); // 0x0000FFFF
 }
