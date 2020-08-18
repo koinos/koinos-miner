@@ -10,9 +10,6 @@
 
 #define SAMPLE_INDICES 10
 
-struct bn bn_primes[10];
-uint32_t buffer_size;
-
 uint32_t primes[10];
 
 uint32_t bignum_mod_small( struct bn* b, uint32_t m )
@@ -42,13 +39,6 @@ void init_work_constants()
    primes[7] = 0x0000ffd9;
    primes[8] = 0x0000ffd3;
    primes[9] = 0x0000ffd1;
-
-   for( i=0; i<10; i++ )
-   {
-      bignum_from_int( bn_primes+i, primes[i] );
-   }
-
-   buffer_size = WORD_BUFFER_LENGTH - 1;
 }
 
 struct work_data
@@ -92,16 +82,16 @@ void find_and_xor_word( struct bn* result, uint32_t x, uint32_t* coefficients, s
    uint64_t y = coefficients[4];
    y *= x;
    y += coefficients[3];
-   y %= buffer_size;
+   y %= WORD_BUFFER_LENGTH - 1;
    y *= x;
    y += coefficients[2];
-   y %= buffer_size;
+   y %= WORD_BUFFER_LENGTH - 1;
    y *= x;
    y += coefficients[1];
-   y %= buffer_size;
+   y %= WORD_BUFFER_LENGTH - 1;
    y *= x;
    y += coefficients[0];
-   y %= buffer_size;
+   y %= WORD_BUFFER_LENGTH - 1;
    bignum_xor( result, word_buffer + y, result );
 }
 
@@ -125,7 +115,7 @@ void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, 
       coefficients[i] = 1 + bignum_mod_small( nonce, primes[i] );
    }
 
-   for( i = 0; i < sizeof(bn_primes) / sizeof(struct bn); ++i )
+   for( i = 0; i < sizeof(primes) / sizeof(uint32_t); ++i )
    {
       find_and_xor_word( result, wdata.x[i], coefficients, word_buffer );
    }
