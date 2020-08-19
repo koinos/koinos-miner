@@ -10,6 +10,8 @@
 
 #define SAMPLE_INDICES 10
 
+#define THREAD_ITERATIONS 60000
+
 uint32_t primes[10];
 
 uint32_t bignum_mod_small( struct bn* b, uint32_t m )
@@ -23,6 +25,20 @@ uint32_t bignum_mod_small( struct bn* b, uint32_t m )
       tmp %= m;
    }
    return (uint32_t) tmp;
+}
+
+void bignum_add_small( struct bn* b, uint32_t n )
+{
+
+   uint32_t tmp = b->array[0];
+   b->array[0] += n;
+   int i = 0;
+   while( i < BN_ARRAY_SIZE - 1 && tmp > b->array[i] )
+   {
+      tmp = b->array[i+1];
+      b->array[i+1]++;
+      i++;
+   }
 }
 
 void init_work_constants()
@@ -166,7 +182,7 @@ int main( int argc, char** argv )
    bignum_init( &ss.recent_eth_block_hash );
    bignum_init( &ss.target );
    bignum_dec( &ss.target );
-   bignum_rshift( &ss.target, &ss.target, 20 );
+   bignum_rshift( &ss.target, &ss.target, 29 );
    bignum_init( &ss.pow_height );
    //keccak_init( &c );
    //keccak_update( &c, "oo", 5 );
@@ -192,30 +208,35 @@ int main( int argc, char** argv )
       {
          #pragma omp critical
          {
-            bignum_inc( &s_nonce );
+            bignum_add_small( &s_nonce, THREAD_ITERATIONS );
             bignum_assign( &t_nonce, &s_nonce );
          }
 
-         work( &t_result, &secured_struct_hash, &t_nonce, word_buffer );
-
-         if( bignum_cmp( &t_result, &ss.target ) <= 0)
+         for( int i = 0; i < THREAD_ITERATIONS; i++ )
          {
-            #pragma omp crticial
+            work( &t_result, &secured_struct_hash, &t_nonce, word_buffer );
+
+            if( bignum_cmp( &t_result, &ss.target ) <= 0)
             {
-               // Two threads could find a valid proof at the same time (unlikely, but possible).
-               // We want to return the more difficult proof
-               if( !stop )
+               #pragma omp crticial
                {
-                  stop = true;
-                  bignum_assign( &result, &t_result );
-                  bignum_assign( &nonce, &t_nonce );
-               }
-               else if( bignum_cmp( &t_result, &result ) < 0 )
-               {
-                  bignum_assign( &result, &t_result );
-                  bignum_assign( &nonce, &t_nonce );
+                  // Two threads could find a valid proof at the same time (unlikely, but possible).
+                  // We want to return the more difficult proof
+                  if( !stop )
+                  {
+                     stop = true;
+                     bignum_assign( &result, &t_result );
+                     bignum_assign( &nonce, &t_nonce );
+                  }
+                  else if( bignum_cmp( &t_result, &result ) < 0 )
+                  {
+                     bignum_assign( &result, &t_result );
+                     bignum_assign( &nonce, &t_nonce );
+                  }
                }
             }
+            else
+               bignum_inc( &t_nonce );
          }
       }
    }
@@ -225,4 +246,7 @@ int main( int argc, char** argv )
 
    bignum_to_string( &result, bn_str, sizeof(bn_str), true );
    printf( "Proof: 0x%s\n", bn_str );
+
+   bignum_to_string( &s_nonce, bn_str, sizeof(bn_str), false );
+   printf( "Total Hashes: %s\n", bn_str );
 }
