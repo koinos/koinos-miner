@@ -5,10 +5,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 #define WORD_BUFFER_BYTES  (2 << 20) // 2 MB
 #define WORD_BUFFER_LENGTH (WORD_BUFFER_BYTES / sizeof(struct bn))
 
 #define SAMPLE_INDICES 10
+#define READ_BUFSIZE   1024
+#define ETH_HASH_SIZE  66
 
 struct bn primes[10];
 struct bn buffer_size;
@@ -41,6 +49,52 @@ struct secured_struct
    //struct bn tip_percent;
 };
 
+struct input_data
+{
+   char     block_hash[ETH_HASH_SIZE + 1];
+   uint64_t block_num;
+};
+
+void read_data( struct input_data* d )
+{
+   char buf[READ_BUFSIZE] = { '\0' };
+
+   int i = 0;
+   do
+   {
+      int c;
+      while ((c = getchar()) != '\n' && c != EOF)
+      {
+         if ( i < READ_BUFSIZE )
+         {
+            buf[i++] = c;
+         }
+         else
+         {
+            fprintf(stderr, "[C] Buffer was about to overflow!");
+         }
+      }
+   } while ( strlen(buf) == 0 || buf[strlen(buf)-1] != ';' );
+
+   fprintf(stderr, "[C] Buffer: %s\n", buf);
+   sscanf(buf, "%66s %llu", d->block_hash, &d->block_num);
+
+   fprintf(stderr, "[C] Ethereum Block Hash: %s\n", d->block_hash );
+   fprintf(stderr, "[C] Ethereum Block Number: %llu\n", d->block_num );
+   fflush(stderr);
+}
+
+void write_data( struct bn* nonce )
+{
+   char bn_str[78];
+   bignum_to_string( nonce, bn_str, sizeof(bn_str), false );
+
+   fprintf(stderr, "[C] Nonce: %s\n", bn_str);
+   fflush(stderr);
+
+   fprintf(stdout, "%s;", bn_str );
+   fflush(stdout);
+}
 
 void hash_secured_struct( struct bn* res, struct secured_struct* ss )
 {
@@ -130,42 +184,47 @@ int main( int argc, char** argv )
 
    init_work_constants();
 
-   struct secured_struct ss;
-
-   keccak_init( &c );
-   keccak_update( &c, (unsigned char*)"miner", 5 );
-   keccak_final( &c, (unsigned char*)&ss.miner );
-   bignum_endian_swap( &ss.miner );
-   bignum_init( &ss.recent_eth_block_number );
-   bignum_init( &ss.recent_eth_block_hash );
-   bignum_init( &ss.target );
-   bignum_dec( &ss.target );
-   bignum_rshift( &ss.target, &ss.target, 19 );
-   bignum_init( &ss.pow_height );
-   //keccak_init( &c );
-   //keccak_update( &c, "oo", 5 );
-   //keccak_final( &c, (unsigned char*)&ss.tip_recipient );
-   //bignum_endian_swap( &ss.tip_recipient );
-   //bignum_from_int( &ss.tip_percent, 5 );
-
-   struct bn secured_struct_hash;
-   hash_secured_struct( &secured_struct_hash, &ss );
-
-   struct bn nonce;
-   bignum_init( &nonce );
-
-   struct bn result;
-
-   do
+   while ( true )
    {
-      bignum_inc( &nonce );
-      work( &result, &secured_struct_hash, &nonce, word_buffer );
-   } while( bignum_cmp( &result, &ss.target ) > 0 );
+      struct input_data input;
+
+      read_data( &input );
+
+      struct secured_struct ss;
+
+      keccak_init( &c );
+      keccak_update( &c, (unsigned char*)"miner", 5 );
+      keccak_final( &c, (unsigned char*)&ss.miner );
+      bignum_endian_swap( &ss.miner );
+//      bignum_init( &ss.recent_eth_block_number );
+      bignum_from_int( &ss.recent_eth_block_number, input.block_num );
+//      bignum_init( &ss.recent_eth_block_hash );
+      bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 1 );
+      bignum_init( &ss.target );
+      bignum_dec( &ss.target );
+      bignum_rshift( &ss.target, &ss.target, 19 );
+      bignum_init( &ss.pow_height );
+      //keccak_init( &c );
+      //keccak_update( &c, "oo", 5 );
+      //keccak_final( &c, (unsigned char*)&ss.tip_recipient );
+      //bignum_endian_swap( &ss.tip_recipient );
+      //bignum_from_int( &ss.tip_percent, 5 );
+
+      struct bn secured_struct_hash;
+      hash_secured_struct( &secured_struct_hash, &ss );
+
+      struct bn nonce;
+      bignum_init( &nonce );
+
+      struct bn result;
+
+      do
+      {
+         bignum_inc( &nonce );
+         work( &result, &secured_struct_hash, &nonce, word_buffer );
+      } while( bignum_cmp( &result, &ss.target ) > 0 );
 
 
-   bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
-   printf( "Nonce: %s\n", bn_str );
-
-   bignum_to_string( &result, bn_str, sizeof(bn_str), true );
-   printf( "Proof: 0x%s\n", bn_str );
+      write_data( &nonce );
+   }
 }
