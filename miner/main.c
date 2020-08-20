@@ -230,6 +230,7 @@ int main( int argc, char** argv )
                   timeinfo = localtime( &timer );
                   strftime( time_str, sizeof(time_str), "%FT%T", timeinfo );
                   fprintf( stdout, "H: %s %" PRId64 ";\n", time_str, hashes );
+                  fflush( stdout );
                   hash_report_counter = 0;
                }
                else
@@ -281,6 +282,8 @@ int main( int argc, char** argv )
       bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
       fprintf( stdout, "N: %s;\n", bn_str );
    }
+
+   fflush( stdout );
 
    bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
    printf( "Nonce: %s\n", bn_str );
