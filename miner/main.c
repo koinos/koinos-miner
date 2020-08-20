@@ -1,18 +1,21 @@
 #include "bn.h"
 #include "keccak256.h"
 
+#include <inttypes.h>
+#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define WORD_BUFFER_BYTES  (2 << 20) // 2 MB
 #define WORD_BUFFER_LENGTH (WORD_BUFFER_BYTES / sizeof(struct bn))
 
 #define SAMPLE_INDICES 10
 
-#define THREAD_ITERATIONS 60000
+#define THREAD_ITERATIONS 600000
 
-uint32_t primes[10];
+uint32_t coprimes[10];
 
 uint32_t bignum_mod_small( struct bn* b, uint32_t m )
 {
@@ -45,16 +48,16 @@ void init_work_constants()
 {
    size_t i;
 
-   primes[0] = 0x0000fffd;
-   primes[1] = 0x0000fffb;
-   primes[2] = 0x0000fff7;
-   primes[3] = 0x0000fff1;
-   primes[4] = 0x0000ffef;
-   primes[5] = 0x0000ffe5;
-   primes[6] = 0x0000ffdf;
-   primes[7] = 0x0000ffd9;
-   primes[8] = 0x0000ffd3;
-   primes[9] = 0x0000ffd1;
+   coprimes[0] = 0x0000fffd;
+   coprimes[1] = 0x0000fffb;
+   coprimes[2] = 0x0000fff7;
+   coprimes[3] = 0x0000fff1;
+   coprimes[4] = 0x0000ffef;
+   coprimes[5] = 0x0000ffe5;
+   coprimes[6] = 0x0000ffdf;
+   coprimes[7] = 0x0000ffd9;
+   coprimes[8] = 0x0000ffd3;
+   coprimes[9] = 0x0000ffd1;
 }
 
 struct work_data
@@ -68,28 +71,31 @@ void init_work_data( struct work_data* wdata, struct bn* secured_struct_hash )
    struct bn x;
    for( i=0; i<10; i++ )
    {
-      wdata->x[i] = bignum_mod_small( secured_struct_hash, primes[i] );
+      wdata->x[i] = bignum_mod_small( secured_struct_hash, coprimes[i] );
    }
 }
 
 struct secured_struct
 {
    struct bn miner;
+   struct bn oo_address;
+   struct bn miner_percent;
+   struct bn oo_percent;
    struct bn recent_eth_block_number;
    struct bn recent_eth_block_hash;
    struct bn target;
    struct bn pow_height;
-   //struct bn tip_recipient;
-   //struct bn tip_percent;
 };
 
 void hash_secured_struct( struct bn* res, struct secured_struct* ss )
 {
+   bignum_endian_swap( &ss->target );
    SHA3_CTX c;
    keccak_init( &c );
    keccak_update( &c, (unsigned char*)ss, sizeof(struct secured_struct) );
    keccak_final( &c, (unsigned char*)res );
    bignum_endian_swap( res );
+   bignum_endian_swap( &ss->target );
 }
 
 
@@ -128,15 +134,14 @@ void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, 
    int i;
    for( i = 0; i < sizeof(coefficients) / sizeof(uint32_t); ++i )
    {
-      coefficients[i] = 1 + bignum_mod_small( nonce, primes[i] );
+      coefficients[i] = 1 + bignum_mod_small( nonce, coprimes[i] );
    }
 
-   for( i = 0; i < sizeof(primes) / sizeof(uint32_t); ++i )
+   for( i = 0; i < sizeof(coprimes) / sizeof(uint32_t); ++i )
    {
       find_and_xor_word( result, wdata.x[i], coefficients, word_buffer );
    }
 }
-
 
 
 int main( int argc, char** argv )
@@ -178,17 +183,17 @@ int main( int argc, char** argv )
    keccak_update( &c, (unsigned char*)"miner", 5 );
    keccak_final( &c, (unsigned char*)&ss.miner );
    bignum_endian_swap( &ss.miner );
+   bignum_from_int( &ss.miner_percent, 9500 );
+   keccak_init( &c );
+   keccak_update( &c, (unsigned char*)"oo_address", 10 );
+   keccak_final( &c, (unsigned char*)&ss.oo_address );
+   bignum_from_int( &ss.oo_percent, 500 );
    bignum_init( &ss.recent_eth_block_number );
    bignum_init( &ss.recent_eth_block_hash );
    bignum_init( &ss.target );
    bignum_dec( &ss.target );
-   bignum_rshift( &ss.target, &ss.target, 29 );
+   bignum_rshift( &ss.target, &ss.target, 32 );
    bignum_init( &ss.pow_height );
-   //keccak_init( &c );
-   //keccak_update( &c, "oo", 5 );
-   //keccak_final( &c, (unsigned char*)&ss.tip_recipient );
-   //bignum_endian_swap( &ss.tip_recipient );
-   //bignum_from_int( &ss.tip_percent, 5 );
 
    struct bn secured_struct_hash;
    hash_secured_struct( &secured_struct_hash, &ss );
@@ -200,19 +205,45 @@ int main( int argc, char** argv )
    bool stop = false;
 
    bignum_assign( &s_nonce, &nonce );
+   uint32_t hash_report_counter = 0;
+   time_t timer;
+   struct tm* timeinfo;
+   char time_str[20];
 
+   uint64_t thread_iterations = THREAD_ITERATIONS;
+   uint64_t hash_limit = ~0;
+   uint64_t hashes = 0;
+
+   bignum_init( &result );
 
    #pragma omp parallel private(t_nonce, t_result)
    {
-      while( !stop )
+      while( !stop && hashes <= hash_limit )
       {
          #pragma omp critical
          {
-            bignum_add_small( &s_nonce, THREAD_ITERATIONS );
+            if( omp_get_thread_num() == 0 )
+            {
+               if( hash_report_counter >= 10 )
+               {
+                  time( &timer );
+                  timeinfo = localtime( &timer );
+                  strftime( time_str, sizeof(time_str), "%FT%T", timeinfo );
+                  fprintf( stdout, "H: %s %" PRId64 ";\n", time_str, hashes );
+                  hash_report_counter = 0;
+               }
+               else
+               {
+                  hash_report_counter++;
+               }
+
+            }
             bignum_assign( &t_nonce, &s_nonce );
+            bignum_add_small( &s_nonce, thread_iterations );
+            hashes += thread_iterations;
          }
 
-         for( int i = 0; i < THREAD_ITERATIONS; i++ )
+         for( uint64_t i = 0; i < thread_iterations; i++ )
          {
             work( &t_result, &secured_struct_hash, &t_nonce, word_buffer );
 
@@ -239,6 +270,16 @@ int main( int argc, char** argv )
                bignum_inc( &t_nonce );
          }
       }
+   }
+
+   if( bignum_is_zero( &result ) )
+   {
+      fprintf( stdout, "F:1;\n" );
+   }
+   else
+   {
+      bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
+      fprintf( stdout, "N: %s;\n", bn_str );
    }
 
    bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
