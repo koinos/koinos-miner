@@ -22,6 +22,7 @@ var start_time = Date.now();
 var end_time = Date.now();
 var last_proof = Date.now();
 var hashes = 0;
+var hash_rate = 0;
 
 console.log( `[JS] Ethereum Address: ${program.addr}` );
 console.log( `[JS] Ethereum Endpoint: ${program.endpoint}` );
@@ -69,6 +70,7 @@ async function mine() {
       console.log( "[JS] Ethereum Block Hash:   " + block.hash );
       console.log( "[JS] Target Difficulty:     " + difficulty_str );
       start_time = Date.now();
+      hashes = 0;
       child.stdin.write(
          block.hash + " " +
          block.number.toString() + " " +
@@ -80,11 +82,21 @@ async function mine() {
    });
 }
 
+function updateHashrate(d_hashes, d_time) {
+   if ( hash_rate > 0 ) {
+      hash_rate += Math.trunc((d_hashes * 1000) / d_time);
+      hash_rate /= 2;
+   }
+   else {
+      hash_rate = Math.trunc((d_hashes * 1000) / d_time);
+   }
+}
+
 function adjustDifficulty() {
    const max_hash = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"); // 2^256 - 1
-   var hash_rate = Math.trunc(hashes * 1000 / (end_time - start_time));
    var hashes_per_period = hash_rate * parseInt(program.proofPeriod);
-   difficulty = max_hash / BigInt(hashes_per_period);
+   difficulty = max_hash / BigInt(Math.trunc(hashes_per_period));
+   difficulty >>= 1n;
    thread_iterations = hash_rate / os.cpus().length; // Per thread hash rate
    hash_limit = hash_rate * 60 * 30; // Hashes for 30 minutes
 }
@@ -113,9 +125,11 @@ child.stdout.on('data', function (data) {
       mine();
    }
    else if ( isNonce(data) ) {
-      end_time = Date.now();
-      hashes = parseInt(getValue(data),16);
-      console.log( "[JS] Nonce: " + hashes );
+      var now = Date.now();
+      var new_hashes = parseInt(getValue(data),16);
+      updateHashrate(new_hashes - hashes, now - end_time);
+      end_time = now;
+      console.log( "[JS] Nonce: " + new_hashes );
       var delta = end_time - last_proof;
       last_proof = end_time;
       var ms = delta % 1000;
@@ -131,9 +145,12 @@ child.stdout.on('data', function (data) {
    }
    else if ( isHashReport(data) ) {
       var ret = getValue(data).split(" ");
-      end_time = Date.parse(ret[0]);
-      hashes = parseInt(ret[1]);
-      console.log( "[JS] Current hash rate: " + formatHashrate(Math.trunc(hashes * 1000 / (end_time - start_time))) );
+      var now = Date.now();
+      var new_hashes = parseInt(ret[1]);
+      updateHashrate(new_hashes - hashes, now - end_time);
+      hashes = new_hashes;
+      end_time = now;
+      console.log( "[JS] Current hash rate: " + formatHashrate(hash_rate) );
    }
 });
 
