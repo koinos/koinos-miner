@@ -33,8 +33,8 @@ SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror" )
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-pragmas" )
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas" )
 
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fopenmp")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -fopenmp")
 
 if(APPLE)
    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GNU_SOURCE")
