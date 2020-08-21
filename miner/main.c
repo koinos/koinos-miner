@@ -143,7 +143,7 @@ void read_data( struct input_data* d )
    fprintf(stderr, "[C] Difficulty Target: %s\n", d->difficulty_str );
    fprintf(stderr, "[C] OpenOrchard Tip: %llu\n", d->tip );
    fprintf(stderr, "[C] PoW Height: %llu\n", d->pow_height );
-   fprintf(stderr, "[C] Total Iterations: %llu\n", d->thread_iterations );
+   fprintf(stderr, "[C] Thread Iterations: %llu\n", d->thread_iterations );
    fprintf(stderr, "[C] Hash Limit: %llu\n", d->hash_limit );
    fflush(stderr);
 }

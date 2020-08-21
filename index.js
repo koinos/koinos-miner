@@ -14,8 +14,10 @@ program
 
 let tip = program.tip  * 100;
 var pow_height = 0;
-var thread_iterations = 600000;
-var hash_limit = 100000000;
+//var thread_iterations = 600000;
+//var hash_limit = 100000000;
+var thread_iterations = 1;
+var hash_limit = 180;
 // Start at 32 bits of difficulty
 var difficulty = BigInt("0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 var start_time = Date.now();
@@ -83,6 +85,7 @@ async function mine() {
 }
 
 function updateHashrate(d_hashes, d_time) {
+   d_time = Math.min(d_time, 1);
    if ( hash_rate > 0 ) {
       hash_rate += Math.trunc((d_hashes * 1000) / d_time);
       hash_rate /= 2;
@@ -94,10 +97,11 @@ function updateHashrate(d_hashes, d_time) {
 
 function adjustDifficulty() {
    const max_hash = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"); // 2^256 - 1
+   hash_rate = Math.max(hash_rate, 1);
    var hashes_per_period = hash_rate * parseInt(program.proofPeriod);
    difficulty = max_hash / BigInt(Math.trunc(hashes_per_period));
    difficulty >>= 1n;
-   thread_iterations = hash_rate / os.cpus().length; // Per thread hash rate
+   thread_iterations = Math.max(hash_rate / os.cpus().length, 1); // Per thread hash rate
    hash_limit = hash_rate * 60 * 30; // Hashes for 30 minutes
 }
 
@@ -125,11 +129,9 @@ child.stdout.on('data', function (data) {
       mine();
    }
    else if ( isNonce(data) ) {
-      var now = Date.now();
-      var new_hashes = parseInt(getValue(data),16);
-      updateHashrate(new_hashes - hashes, now - end_time);
-      end_time = now;
-      console.log( "[JS] Nonce: " + new_hashes );
+      end_time = Date.now();
+      var nonce = parseInt(getValue(data),16);
+      console.log( "[JS] Nonce: " + nonce );
       var delta = end_time - last_proof;
       last_proof = end_time;
       var ms = delta % 1000;
