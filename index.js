@@ -14,10 +14,8 @@ program
 
 let tip = program.tip  * 100;
 var pow_height = 0;
-//var thread_iterations = 600000;
-//var hash_limit = 100000000;
-var thread_iterations = 1;
-var hash_limit = 180;
+var thread_iterations = 600000;
+var hash_limit = 100000000;
 // Start at 32 bits of difficulty
 var difficulty = BigInt("0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
 var start_time = Date.now();
