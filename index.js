@@ -83,7 +83,7 @@ async function mine() {
 }
 
 function updateHashrate(d_hashes, d_time) {
-   d_time = Math.min(d_time, 1);
+   d_time = Math.max(d_time, 1);
    if ( hash_rate > 0 ) {
       hash_rate += Math.trunc((d_hashes * 1000) / d_time);
       hash_rate /= 2;
