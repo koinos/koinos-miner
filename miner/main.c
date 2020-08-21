@@ -100,7 +100,7 @@ struct input_data
 {
    char     block_hash[ETH_HASH_SIZE + 1];
    uint64_t block_num;
-   uint64_t difficulty_bits;
+   char     difficulty_str[ETH_HASH_SIZE + 1];
    uint64_t tip;
    uint64_t pow_height;
    uint64_t thread_iterations;
@@ -129,10 +129,10 @@ void read_data( struct input_data* d )
    } while ( strlen(buf) == 0 || buf[strlen(buf)-1] != ';' );
 
    fprintf(stderr, "[C] Buffer: %s\n", buf);
-   sscanf(buf, "%66s %llu %llu %llu %llu %llu %llu", 
+   sscanf(buf, "%66s %llu %66s %llu %llu %llu %llu",
       d->block_hash,
       &d->block_num,
-      &d->difficulty_bits,
+      &d->difficulty_str,
       &d->tip,
       &d->pow_height,
       &d->thread_iterations,
@@ -140,7 +140,7 @@ void read_data( struct input_data* d )
 
    fprintf(stderr, "[C] Ethereum Block Hash: %s\n", d->block_hash );
    fprintf(stderr, "[C] Ethereum Block Number: %llu\n", d->block_num );
-   fprintf(stderr, "[C] Difficulty Bits: %llu\n", d->difficulty_bits );
+   fprintf(stderr, "[C] Difficulty Target: %s\n", d->difficulty_str );
    fprintf(stderr, "[C] OpenOrchard Tip: %llu\n", d->tip );
    fprintf(stderr, "[C] PoW Height: %llu\n", d->pow_height );
    fprintf(stderr, "[C] Total Iterations: %llu\n", d->thread_iterations );
@@ -244,9 +244,10 @@ int main( int argc, char** argv )
       bignum_from_int( &ss.oo_percent, input.tip );
       bignum_from_int( &ss.recent_eth_block_number, input.block_num );
       bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 2 );
-      bignum_init( &ss.target );
-      bignum_dec( &ss.target );
-      bignum_rshift( &ss.target, &ss.target, input.difficulty_bits );
+      //bignum_init( &ss.target );
+      //bignum_dec( &ss.target );
+      //bignum_rshift( &ss.target, &ss.target, input.difficulty_bits );
+      bignum_from_string( &ss.target, input.difficulty_str + 2, ETH_HASH_SIZE - 2 );
       bignum_from_int( &ss.pow_height, input.pow_height );
 
       if( bignum_cmp( &seed, &ss.recent_eth_block_hash ) )
@@ -268,6 +269,9 @@ int main( int argc, char** argv )
 
       bignum_to_string( &seed, bn_str, sizeof(bn_str), true );
       fprintf(stderr, "[C] Seed: %s\n", bn_str);
+
+      bignum_to_string( &ss.target, bn_str, sizeof(bn_str), true );
+      fprintf(stderr, "[C] Difficulty Target: %s\n", bn_str);
       fflush(stderr);
 
       struct bn secured_struct_hash;
