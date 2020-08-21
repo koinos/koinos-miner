@@ -20,6 +20,7 @@
 #define SAMPLE_INDICES 10
 #define READ_BUFSIZE   1024
 #define ETH_HASH_SIZE  66
+#define PERCENT_100    10000
 
 #define THREAD_ITERATIONS 600000
 
@@ -99,6 +100,11 @@ struct input_data
 {
    char     block_hash[ETH_HASH_SIZE + 1];
    uint64_t block_num;
+   uint64_t difficulty_bits;
+   uint64_t tip;
+   uint64_t pow_height;
+   uint64_t thread_iterations;
+   uint64_t hash_limit;
 };
 
 void read_data( struct input_data* d )
@@ -123,10 +129,22 @@ void read_data( struct input_data* d )
    } while ( strlen(buf) == 0 || buf[strlen(buf)-1] != ';' );
 
    fprintf(stderr, "[C] Buffer: %s\n", buf);
-   sscanf(buf, "%66s %llu", d->block_hash, &d->block_num);
+   sscanf(buf, "%66s %llu %llu %llu %llu %llu %llu", 
+      d->block_hash,
+      &d->block_num,
+      &d->difficulty_bits,
+      &d->tip,
+      &d->pow_height,
+      &d->thread_iterations,
+      &d->hash_limit);
 
    fprintf(stderr, "[C] Ethereum Block Hash: %s\n", d->block_hash );
    fprintf(stderr, "[C] Ethereum Block Number: %llu\n", d->block_num );
+   fprintf(stderr, "[C] Difficulty Bits: %llu\n", d->difficulty_bits );
+   fprintf(stderr, "[C] OpenOrchard Tip: %llu\n", d->tip );
+   fprintf(stderr, "[C] PoW Height: %llu\n", d->pow_height );
+   fprintf(stderr, "[C] Total Iterations: %llu\n", d->thread_iterations );
+   fprintf(stderr, "[C] Hash Limit: %llu\n", d->hash_limit );
    fflush(stderr);
 }
 
@@ -190,58 +208,67 @@ void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, 
 int main( int argc, char** argv )
 {
    struct bn* word_buffer = malloc( WORD_BUFFER_BYTES );
-   struct bn seed;
+   struct bn seed, bn_i;
 
    char bn_str[78];
 
    SHA3_CTX c;
 
-   keccak_init( &c );
-   keccak_update( &c, (unsigned char*)"This is the seed.", 17 );
-   keccak_final( &c, (unsigned char*)&seed );
-
-   unsigned char index_padding[24];
-   memset( index_padding, 0, sizeof(index_padding) );
-
-   struct bn bn_i;
-
-   // Procedurally generate word buffer w[i] from a seed
-   // Each word buffer element is computed by w[i] = H(seed, i)
-   for( unsigned long i = 0; i < WORD_BUFFER_LENGTH; i++ )
-   {
-      keccak_init( &c );
-      keccak_update( &c, (unsigned char*)&seed, sizeof(seed) );
-      bignum_from_int( &bn_i, i );
-      bignum_endian_swap( &bn_i );
-      keccak_update( &c, (unsigned char*)&bn_i, sizeof(struct bn) );
-      keccak_final( &c, (unsigned char*)(word_buffer + i) );
-      bignum_endian_swap( word_buffer + i );
-   }
-
    init_work_constants();
+
+   bignum_init( &seed );
 
    while ( true )
    {
       struct input_data input;
 
       read_data( &input );
+
+      uint64_t miner_pay = PERCENT_100 - input.tip;
+      uint64_t oo_pay    = input.tip;
+
+      fprintf(stderr, "[C] Miner pay: %llu\n", miner_pay);
+      fprintf(stderr, "[C] OpenOrchard tip: %llu\n", oo_pay);
+      fflush(stderr);
+
       struct secured_struct ss;
 
       keccak_init( &c );
       keccak_update( &c, (unsigned char*)"miner", 5 );
       keccak_final( &c, (unsigned char*)&ss.miner );
       bignum_endian_swap( &ss.miner );
-      bignum_from_int( &ss.miner_percent, 9500 );
+      bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
       keccak_init( &c );
       keccak_update( &c, (unsigned char*)"oo_address", 10 );
       keccak_final( &c, (unsigned char*)&ss.oo_address );
-      bignum_from_int( &ss.oo_percent, 500 );
+      bignum_from_int( &ss.oo_percent, input.tip );
       bignum_from_int( &ss.recent_eth_block_number, input.block_num );
-      bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 1 );
+      bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 2 );
       bignum_init( &ss.target );
       bignum_dec( &ss.target );
-      bignum_rshift( &ss.target, &ss.target, 32 );
-      bignum_init( &ss.pow_height );
+      bignum_rshift( &ss.target, &ss.target, input.difficulty_bits );
+      bignum_from_int( &ss.pow_height, input.pow_height );
+
+      if( bignum_cmp( &seed, &ss.recent_eth_block_hash ) )
+      {
+         bignum_assign( &seed, &ss.recent_eth_block_hash );
+         // Procedurally generate word buffer w[i] from a seed
+         // Each word buffer element is computed by w[i] = H(seed, i)
+         for( unsigned long i = 0; i < WORD_BUFFER_LENGTH; i++ )
+         {
+            keccak_init( &c );
+            keccak_update( &c, (unsigned char*)&seed, sizeof(seed) );
+            bignum_from_int( &bn_i, i );
+            bignum_endian_swap( &bn_i );
+            keccak_update( &c, (unsigned char*)&bn_i, sizeof(struct bn) );
+            keccak_final( &c, (unsigned char*)(word_buffer + i) );
+            bignum_endian_swap( word_buffer + i );
+         }
+      }
+
+      bignum_to_string( &seed, bn_str, sizeof(bn_str), true );
+      fprintf(stderr, "[C] Seed: %s\n", bn_str);
+      fflush(stderr);
 
       struct bn secured_struct_hash;
       hash_secured_struct( &secured_struct_hash, &ss );
@@ -258,15 +285,13 @@ int main( int argc, char** argv )
       struct tm* timeinfo;
       char time_str[20];
 
-      uint64_t thread_iterations = THREAD_ITERATIONS;
-      uint64_t hash_limit = ~0;
       uint64_t hashes = 0;
 
       bignum_init( &result );
 
       #pragma omp parallel private(t_nonce, t_result)
       {
-         while( !stop && hashes <= hash_limit )
+         while( !stop && hashes <= input.hash_limit )
          {
             #pragma omp critical
             {
@@ -277,7 +302,7 @@ int main( int argc, char** argv )
                      time( &timer );
                      timeinfo = localtime( &timer );
                      strftime( time_str, sizeof(time_str), "%FT%T", timeinfo );
-                     fprintf( stdout, "H: %s %" PRId64 ";\n", time_str, hashes );
+                     fprintf( stdout, "H:%s %" PRId64 ";\n", time_str, hashes );
                      fflush( stdout );
                      hash_report_counter = 0;
                   }
@@ -288,11 +313,11 @@ int main( int argc, char** argv )
 
                }
                bignum_assign( &t_nonce, &s_nonce );
-               bignum_add_small( &s_nonce, thread_iterations );
-               hashes += thread_iterations;
+               bignum_add_small( &s_nonce, input.thread_iterations );
+               hashes += input.thread_iterations;
             }
 
-            for( uint64_t i = 0; i < thread_iterations; i++ )
+            for( uint64_t i = 0; i < input.thread_iterations; i++ )
             {
                work( &t_result, &secured_struct_hash, &t_nonce, word_buffer );
 
@@ -325,24 +350,18 @@ int main( int argc, char** argv )
       {
          fprintf( stdout, "F:1;\n" );
 
-         fprintf(stderr, "[C] Finished without nonce");
+         fprintf(stderr, "[C] Finished without nonce\n");
          fflush(stderr);
       }
       else
       {
          bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
-         fprintf( stdout, "N: %s;\n", bn_str );
+         fprintf( stdout, "N:%s;\n", bn_str );
 
          fprintf(stderr, "[C] Nonce: %s\n", bn_str);
          fflush(stderr);
       }
 
       fflush( stdout );
-
-      // bignum_to_string( &result, bn_str, sizeof(bn_str), true );
-      // printf( "Proof: 0x%s\n", bn_str );
-
-      // bignum_to_string( &s_nonce, bn_str, sizeof(bn_str), false );
-      // printf( "Total Hashes: %s\n", bn_str );
    }
 }

@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "rm -rf build && mkdir build && cd build && cmake -DCMAKE_C_COMPILER=/usr/local/bin/gcc-10 -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build"
+    "postinstall": "rm -rf build && mkdir build && cd build && cmake  -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build"
   },
   "repository": {
     "type": "git",
