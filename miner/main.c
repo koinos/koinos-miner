@@ -84,9 +84,19 @@ void init_work_data( struct work_data* wdata, struct bn* secured_struct_hash )
    }
 }
 
+/*
+ * Solidity definition:
+ *
+ * address[] memory recipients,
+ * uint256[] memory split_percents,
+ * uint256 recent_eth_block_number,
+ * uint256 recent_eth_block_hash,
+ * uint256 target,
+ * uint256 pow_height
+ */
 struct secured_struct
 {
-   struct bn miner;
+   struct bn miner_address;
    struct bn oo_address;
    struct bn miner_percent;
    struct bn oo_percent;
@@ -148,13 +158,51 @@ void read_data( struct input_data* d )
    fflush(stderr);
 }
 
+
 void hash_secured_struct( struct bn* res, struct secured_struct* ss )
 {
+   /* Solidity ABI encodes as follows:
+    *
+    * Offset pointer to recipient array (256 bits big endian)
+    * Offset pointer to split_perecents array (256 bits big endian)
+    * recent_eth_block_number (256 bit big endian)
+    * recent_eth_block_hash (256 bit big endian)
+    * target (256 bit big endian)
+    * pow_height (256 bit big endian)
+    * size of recipient array (256 bit big endian)
+    * miner_address
+    * oo_address
+    * size of split_percent_array (256 bit big endian)
+    * miner_percent
+    * recipient_offset
+    */
+
+   struct bn recipient_offset, split_percent_offset, array_size;
+   bignum_from_int( &recipient_offset, 6 * 32 );
+   bignum_endian_swap( &recipient_offset );
+   bignum_from_int( &split_percent_offset, 9 * 32 );
+   bignum_endian_swap( &recipient_offset );
+   bignum_from_int( &array_size, 2 );
+   bignum_endian_swap( &recipient_offset );
+
    bignum_endian_swap( &ss->target );
+
    SHA3_CTX c;
    keccak_init( &c );
-   keccak_update( &c, (unsigned char*)ss, sizeof(struct secured_struct) );
+   keccak_update( &c, (unsigned char*)&recipient_offset, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&split_percent_offset, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->recent_eth_block_number, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->recent_eth_block_hash, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->target, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->pow_height, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&array_size, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->miner_address, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->oo_address, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&array_size, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->miner_percent, sizeof(struct bn) );
+   keccak_update( &c, (unsigned char*)&ss->oo_percent, sizeof(struct bn) );
    keccak_final( &c, (unsigned char*)res );
+
    bignum_endian_swap( res );
    bignum_endian_swap( &ss->target );
 }
@@ -220,13 +268,13 @@ int main( int argc, char** argv )
 
    bignum_init( &seed );
 
-   bignum_from_string( &ss.miner, argv[1], strlen(argv[1]) );
+   bignum_from_string( &ss.miner_address, argv[1], strlen(argv[1]) );
 
-   bignum_to_string( &ss.miner, bn_str, sizeof(bn_str), false );
+   bignum_to_string( &ss.miner_address, bn_str, sizeof(bn_str), false );
    fprintf(stderr, "[C] Miner Address: %s\n", bn_str);
    fflush(stderr);
 
-   bignum_endian_swap( &ss.miner );
+   bignum_endian_swap( &ss.miner_address );
 
    while ( true )
    {
@@ -243,17 +291,23 @@ int main( int argc, char** argv )
 
 
       bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
+      bignum_endian_swap( &ss.miner_percent );
       keccak_init( &c );
       keccak_update( &c, (unsigned char*)"oo_address", 10 );
       keccak_final( &c, (unsigned char*)&ss.oo_address );
+      bignum_endian_swap( &ss.oo_address );
       bignum_from_int( &ss.oo_percent, input.tip );
+      bignum_endian_swap( &ss.oo_percent );
       bignum_from_int( &ss.recent_eth_block_number, input.block_num );
+      bignum_endian_swap( &ss.recent_eth_block_number );
       bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 2 );
+      bignum_endian_swap( &ss.recent_eth_block_hash );
       //bignum_init( &ss.target );
       //bignum_dec( &ss.target );
       //bignum_rshift( &ss.target, &ss.target, input.difficulty_bits );
       bignum_from_string( &ss.target, input.difficulty_str + 2, ETH_HASH_SIZE - 2 );
       bignum_from_int( &ss.pow_height, input.pow_height );
+      bignum_endian_swap( &ss.pow_height );
 
       if( bignum_cmp( &seed, &ss.recent_eth_block_hash ) )
       {
