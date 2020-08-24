@@ -24,7 +24,7 @@ module.exports = class KoinosMiner {
       this.hashrateCallback = hashrateCallback;
       var self = this;
 
-      // We don't want the mining manager to go down and leave the 
+      // We don't want the mining manager to go down and leave the
       // C process running indefinitely, so we send SIGINT before
       // exiting.
       process.on('uncaughtException', function (err) {
@@ -45,7 +45,7 @@ module.exports = class KoinosMiner {
       console.log("[JS] Starting miner");
       var self = this;
       var spawn = require('child_process').spawn;
-      this.child = spawn( this.minerPath() );
+      this.child = spawn( this.minerPath(), [this.address] );
       this.child.stdin.setEncoding('utf-8');
       this.child.stderr.pipe(process.stdout);
       this.child.stdout.on('data', function (data) {
