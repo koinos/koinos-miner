@@ -262,9 +262,19 @@ int main( int argc, char** argv )
 
    SHA3_CTX c;
 
+   struct secured_struct ss;
+
    init_work_constants();
 
    bignum_init( &seed );
+
+   bignum_from_string( &ss.miner_address, argv[1], strlen(argv[1]) );
+
+   bignum_to_string( &ss.miner_address, bn_str, sizeof(bn_str), false );
+   fprintf(stderr, "[C] Miner Address: %s\n", bn_str);
+   fflush(stderr);
+
+   bignum_endian_swap( &ss.miner_address );
 
    while ( true )
    {
@@ -279,12 +289,7 @@ int main( int argc, char** argv )
       fprintf(stderr, "[C] OpenOrchard tip: %llu\n", oo_pay);
       fflush(stderr);
 
-      struct secured_struct ss;
 
-      keccak_init( &c );
-      keccak_update( &c, (unsigned char*)"miner", 5 );
-      keccak_final( &c, (unsigned char*)&ss.miner_address );
-      bignum_endian_swap( &ss.miner_address );
       bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
       bignum_endian_swap( &ss.miner_percent );
       keccak_init( &c );
