@@ -207,7 +207,6 @@ void hash_secured_struct( struct bn* res, struct secured_struct* ss )
    bignum_endian_swap( &array_size );
 
    bignum_endian_swap( &ss->target );
-   bignum_endian_swap( &ss->recent_eth_block_hash );
 
    SHA3_CTX c;
    keccak_init( &c );
@@ -227,7 +226,6 @@ void hash_secured_struct( struct bn* res, struct secured_struct* ss )
 
    bignum_endian_swap( res );
    bignum_endian_swap( &ss->target );
-   bignum_endian_swap( &ss->recent_eth_block_hash );
 }
 
 
@@ -306,8 +304,6 @@ int main( int argc, char** argv )
    fflush(stderr);
 
    bignum_endian_swap( &ss.miner_address );
-   to_hex_string( (unsigned char*)&ss.miner_address, bn_str, sizeof(struct bn) );
-   fprintf( stderr, "%s\n", bn_str );
 
    while ( true )
    {
@@ -321,7 +317,6 @@ int main( int argc, char** argv )
       fprintf(stderr, "[C] Miner pay: %llu\n", miner_pay);
       fprintf(stderr, "[C] OpenOrchard tip: %llu\n", oo_pay);
       fflush(stderr);
-
 
       bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
       bignum_endian_swap( &ss.miner_percent );
@@ -339,6 +334,8 @@ int main( int argc, char** argv )
       {
          bignum_from_string( &ss.recent_eth_block_hash, input.block_hash, ETH_HASH_SIZE - 2 );
       }
+
+      bignum_endian_swap( &ss.recent_eth_block_hash );
 
       if( is_hex_prefixed( input.difficulty_str ) )
       {
@@ -384,6 +381,7 @@ int main( int argc, char** argv )
 
       struct bn nonce;
       bignum_assign( &nonce, &ss.recent_eth_block_hash );
+      bignum_endian_swap( &nonce );
 
       bignum_to_string( &nonce, bn_str, sizeof(bn_str), true );
       fprintf(stderr, "[C] Starting Nonce: %s\n", bn_str );
