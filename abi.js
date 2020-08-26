@@ -1,6 +1,32 @@
 let abi =
 [
    {
+     "inputs": [
+       {
+         "internalType": "address",
+         "name": "tok",
+         "type": "address"
+       },
+       {
+         "internalType": "uint256",
+         "name": "start_t",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "start_hc_reserve",
+         "type": "uint256"
+       },
+       {
+         "internalType": "bool",
+         "name": "testing",
+         "type": "bool"
+       }
+     ],
+     "stateMutability": "nonpayable",
+     "type": "constructor"
+   },
+   {
      "anonymous": false,
      "inputs": [
        {
@@ -41,6 +67,31 @@ let abi =
        }
      ],
      "name": "Mine",
+     "type": "event"
+   },
+   {
+     "anonymous": false,
+     "inputs": [
+       {
+         "indexed": true,
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "indexed": true,
+         "internalType": "bytes32",
+         "name": "previousAdminRole",
+         "type": "bytes32"
+       },
+       {
+         "indexed": true,
+         "internalType": "bytes32",
+         "name": "newAdminRole",
+         "type": "bytes32"
+       }
+     ],
+     "name": "RoleAdminChanged",
      "type": "event"
    },
    {
@@ -187,19 +238,6 @@ let abi =
    {
      "inputs": [],
      "name": "RECENT_BLOCK_LIMIT",
-     "outputs": [
-       {
-         "internalType": "uint256",
-         "name": "",
-         "type": "uint256"
-       }
-     ],
-     "stateMutability": "view",
-     "type": "function"
-   },
-   {
-     "inputs": [],
-     "name": "START_HC_RESERVE",
      "outputs": [
        {
          "internalType": "uint256",
@@ -528,29 +566,6 @@ let abi =
      "type": "function"
    },
    {
-     "inputs": [
-       {
-         "internalType": "address",
-         "name": "tok",
-         "type": "address"
-       },
-       {
-         "internalType": "uint256",
-         "name": "start_t",
-         "type": "uint256"
-       },
-       {
-         "internalType": "bool",
-         "name": "testing",
-         "type": "bool"
-       }
-     ],
-     "name": "initialize",
-     "outputs": [],
-     "stateMutability": "nonpayable",
-     "type": "function"
-   },
-   {
      "inputs": [],
      "name": "is_testing",
      "outputs": [
@@ -784,6 +799,6 @@ let abi =
      "stateMutability": "pure",
      "type": "function"
    }
-];
+]
 
 module.exports = abi;
