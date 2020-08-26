@@ -811,12 +811,11 @@ module.exports = class KoinosMiner {
 
    constructor(address, endpoint, tip, period, hashrateCallback) {
       this.address = address;
-      //this.address = '0x407bFC161600a0fCa7738c3013F76b99834ef158';
       this.web3 = new Web3( endpoint );
       this.tip  = tip * 100;
       this.proofPeriod = period;
       this.hashrateCallback = hashrateCallback;
-      this.contract = new this.web3.eth.Contract( abi, contract_address, {from: address, gasPrice:'20000000000', gas: 200000} );
+      this.contract = new this.web3.eth.Contract( abi, contract_address, {from: address, gasPrice:'20000000000', gas: 6721975} );
       var self = this;
 
       // We don't want the mining manager to go down and leave the
@@ -1004,14 +1003,6 @@ module.exports = class KoinosMiner {
             this.powHeight + " " +
             Math.trunc(this.threadIterations) + " " +
             Math.trunc(this.hashLimit) + ";\n");
-         //this.child.stdin.write(
-         //   '5d9e66b29457e0f0a66956116fb081e54e757046a3415cc1d854dde1155d4ea9 ' +
-         //   '15 ' +
-         //   '1999999999999999999999999999999999999999999999999999999999999999 ' +
-         //   '2500 ' +
-         //   '1 ' +
-         //   Math.trunc(this.threadIterations) + " " +
-         //   Math.trunc(this.hashLimit) + ";\n");
       });
    }
 }
