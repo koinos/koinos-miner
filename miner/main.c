@@ -24,6 +24,24 @@
 
 #define THREAD_ITERATIONS 600000
 
+int to_hex_string( unsigned char* n, unsigned char* dest, int len )
+{
+   static const char hex[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
+
+   for( int i = 0; i < len; i++ )
+   {
+      dest[2 * i]     = hex[(n[i] & 0xF0) >> 4];
+      dest[2 * i + 1] = hex[n[i] & 0x0F];
+   }
+
+   return len * 2;
+}
+
+bool is_hex_prefixed( char* str )
+{
+   return str[0] == '0' && str[1] == 'x';
+}
+
 uint32_t coprimes[10];
 
 uint32_t bignum_mod_small( struct bn* b, uint32_t m )
@@ -177,13 +195,16 @@ void hash_secured_struct( struct bn* res, struct secured_struct* ss )
     * recipient_offset
     */
 
+   char bn_str[78];
+   memset(bn_str, 0, sizeof(78));
+
    struct bn recipient_offset, split_percent_offset, array_size;
    bignum_from_int( &recipient_offset, 6 * 32 );
    bignum_endian_swap( &recipient_offset );
    bignum_from_int( &split_percent_offset, 9 * 32 );
-   bignum_endian_swap( &recipient_offset );
+   bignum_endian_swap( &split_percent_offset );
    bignum_from_int( &array_size, 2 );
-   bignum_endian_swap( &recipient_offset );
+   bignum_endian_swap( &array_size );
 
    bignum_endian_swap( &ss->target );
 
@@ -268,7 +289,15 @@ int main( int argc, char** argv )
 
    bignum_init( &seed );
 
-   bignum_from_string( &ss.miner_address, argv[1], strlen(argv[1]) );
+   if( is_hex_prefixed( argv[1] ) )
+   {
+      bignum_from_string( &ss.miner_address, argv[1] + 2, strlen(argv[1]) - 2 );
+   }
+   else
+   {
+      bignum_from_string( &ss.miner_address, argv[1] , strlen(argv[1]) );
+   }
+
 
    bignum_to_string( &ss.miner_address, bn_str, sizeof(bn_str), false );
    fprintf(stderr, "[C] Miner Address: %s\n", bn_str);
@@ -289,23 +318,34 @@ int main( int argc, char** argv )
       fprintf(stderr, "[C] OpenOrchard tip: %llu\n", oo_pay);
       fflush(stderr);
 
-
       bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
       bignum_endian_swap( &ss.miner_percent );
-      keccak_init( &c );
-      keccak_update( &c, (unsigned char*)"oo_address", 10 );
-      keccak_final( &c, (unsigned char*)&ss.oo_address );
+      bignum_from_string( &ss.oo_address, "8c7b3F56C5d06710701eD51fB2aAD709CBff9D00", 40 );
       bignum_endian_swap( &ss.oo_address );
       bignum_from_int( &ss.oo_percent, input.tip );
       bignum_endian_swap( &ss.oo_percent );
       bignum_from_int( &ss.recent_eth_block_number, input.block_num );
       bignum_endian_swap( &ss.recent_eth_block_number );
-      bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 2 );
+      if( is_hex_prefixed( input.block_hash ) )
+      {
+         bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 2 );
+      }
+      else
+      {
+         bignum_from_string( &ss.recent_eth_block_hash, input.block_hash, ETH_HASH_SIZE - 2 );
+      }
+
       bignum_endian_swap( &ss.recent_eth_block_hash );
-      //bignum_init( &ss.target );
-      //bignum_dec( &ss.target );
-      //bignum_rshift( &ss.target, &ss.target, input.difficulty_bits );
-      bignum_from_string( &ss.target, input.difficulty_str + 2, ETH_HASH_SIZE - 2 );
+
+      if( is_hex_prefixed( input.difficulty_str ) )
+      {
+         bignum_from_string( &ss.target, input.difficulty_str + 2, ETH_HASH_SIZE - 2 );
+      }
+      else
+      {
+         bignum_from_string( &ss.target, input.difficulty_str, ETH_HASH_SIZE - 2 );
+      }
+
       bignum_from_int( &ss.pow_height, input.pow_height );
       bignum_endian_swap( &ss.pow_height );
 
@@ -336,8 +376,15 @@ int main( int argc, char** argv )
       struct bn secured_struct_hash;
       hash_secured_struct( &secured_struct_hash, &ss );
 
+      bignum_to_string( &secured_struct_hash, bn_str, sizeof(bn_str), true);
+      fprintf(stderr, "[C] Secured Struct Hash: %s\n", bn_str );
+
       struct bn nonce;
-      bignum_init( &nonce );
+      bignum_assign( &nonce, &ss.recent_eth_block_hash );
+      bignum_endian_swap( &nonce );
+
+      bignum_to_string( &nonce, bn_str, sizeof(bn_str), true );
+      fprintf(stderr, "[C] Starting Nonce: %s\n", bn_str );
 
       struct bn result, t_nonce, t_result, s_nonce;
       bool stop = false;

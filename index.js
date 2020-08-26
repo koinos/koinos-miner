@@ -2,8 +2,800 @@
 
 var Web3 = require('web3');
 const os = require('os');
+//const abi = require('./abi.js')
+
+const contract_address = '0x97AF17cDda337a87Ab335F496f5ca4B8520952bf'
+
+var abi =
+[
+   {
+     "anonymous": false,
+     "inputs": [
+       {
+         "indexed": false,
+         "internalType": "address[]",
+         "name": "recipients",
+         "type": "address[]"
+       },
+       {
+         "indexed": false,
+         "internalType": "uint256[]",
+         "name": "split_percents",
+         "type": "uint256[]"
+       },
+       {
+         "indexed": false,
+         "internalType": "uint256",
+         "name": "hc_submit",
+         "type": "uint256"
+       },
+       {
+         "indexed": false,
+         "internalType": "uint256",
+         "name": "hc_decay",
+         "type": "uint256"
+       },
+       {
+         "indexed": false,
+         "internalType": "uint256",
+         "name": "token_virtual_mint",
+         "type": "uint256"
+       },
+       {
+         "indexed": false,
+         "internalType": "uint256[]",
+         "name": "tokens_mined",
+         "type": "uint256[]"
+       }
+     ],
+     "name": "Mine",
+     "type": "event"
+   },
+   {
+     "anonymous": false,
+     "inputs": [
+       {
+         "indexed": true,
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "indexed": true,
+         "internalType": "address",
+         "name": "account",
+         "type": "address"
+       },
+       {
+         "indexed": true,
+         "internalType": "address",
+         "name": "sender",
+         "type": "address"
+       }
+     ],
+     "name": "RoleGranted",
+     "type": "event"
+   },
+   {
+     "anonymous": false,
+     "inputs": [
+       {
+         "indexed": true,
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "indexed": true,
+         "internalType": "address",
+         "name": "account",
+         "type": "address"
+       },
+       {
+         "indexed": true,
+         "internalType": "address",
+         "name": "sender",
+         "type": "address"
+       }
+     ],
+     "name": "RoleRevoked",
+     "type": "event"
+   },
+   {
+     "inputs": [],
+     "name": "DEFAULT_ADMIN_ROLE",
+     "outputs": [
+       {
+         "internalType": "bytes32",
+         "name": "",
+         "type": "bytes32"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "EMISSION_COEFF_1",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "EMISSION_COEFF_2",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "FINAL_PRINT_RATE",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "HC_RESERVE_DECAY_TIME",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "MINEABLE_TOKENS",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "ONE_KNS",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "RECENT_BLOCK_LIMIT",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "START_HC_RESERVE",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "TOTAL_EMISSION_TIME",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "address[]",
+         "name": "recipients",
+         "type": "address[]"
+       },
+       {
+         "internalType": "uint256[]",
+         "name": "split_percents",
+         "type": "uint256[]"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_number",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_hash",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "target",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "pow_height",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "nonce",
+         "type": "uint256"
+       }
+     ],
+     "name": "check_pow",
+     "outputs": [],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       }
+     ],
+     "name": "getRoleAdmin",
+     "outputs": [
+       {
+         "internalType": "bytes32",
+         "name": "",
+         "type": "bytes32"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "internalType": "uint256",
+         "name": "index",
+         "type": "uint256"
+       }
+     ],
+     "name": "getRoleMember",
+     "outputs": [
+       {
+         "internalType": "address",
+         "name": "",
+         "type": "address"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       }
+     ],
+     "name": "getRoleMemberCount",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "uint256",
+         "name": "current_time",
+         "type": "uint256"
+       }
+     ],
+     "name": "get_background_activity",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "hc_decay",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "token_virtual_mint",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "uint256",
+         "name": "t",
+         "type": "uint256"
+       }
+     ],
+     "name": "get_emission_curve",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "uint256",
+         "name": "hc",
+         "type": "uint256"
+       }
+     ],
+     "name": "get_hash_credits_conversion",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "uint256",
+         "name": "dt",
+         "type": "uint256"
+       }
+     ],
+     "name": "get_hc_reserve_multiplier",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "pure",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "address",
+         "name": "miner",
+         "type": "address"
+       }
+     ],
+     "name": "get_pow_height",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "address[]",
+         "name": "recipients",
+         "type": "address[]"
+       },
+       {
+         "internalType": "uint256[]",
+         "name": "split_percents",
+         "type": "uint256[]"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_number",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_hash",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "target",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "pow_height",
+         "type": "uint256"
+       }
+     ],
+     "name": "get_secured_struct_hash",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "pure",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "internalType": "address",
+         "name": "account",
+         "type": "address"
+       }
+     ],
+     "name": "grantRole",
+     "outputs": [],
+     "stateMutability": "nonpayable",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "internalType": "address",
+         "name": "account",
+         "type": "address"
+       }
+     ],
+     "name": "hasRole",
+     "outputs": [
+       {
+         "internalType": "bool",
+         "name": "",
+         "type": "bool"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "hc_reserve",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "address",
+         "name": "tok",
+         "type": "address"
+       },
+       {
+         "internalType": "uint256",
+         "name": "start_t",
+         "type": "uint256"
+       },
+       {
+         "internalType": "bool",
+         "name": "testing",
+         "type": "bool"
+       }
+     ],
+     "name": "initialize",
+     "outputs": [],
+     "stateMutability": "nonpayable",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "is_testing",
+     "outputs": [
+       {
+         "internalType": "bool",
+         "name": "",
+         "type": "bool"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "last_mint_time",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "address[]",
+         "name": "recipients",
+         "type": "address[]"
+       },
+       {
+         "internalType": "uint256[]",
+         "name": "split_percents",
+         "type": "uint256[]"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_number",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_hash",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "target",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "pow_height",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "nonce",
+         "type": "uint256"
+       }
+     ],
+     "name": "mine",
+     "outputs": [],
+     "stateMutability": "nonpayable",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "internalType": "address",
+         "name": "account",
+         "type": "address"
+       }
+     ],
+     "name": "renounceRole",
+     "outputs": [],
+     "stateMutability": "nonpayable",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "bytes32",
+         "name": "role",
+         "type": "bytes32"
+       },
+       {
+         "internalType": "address",
+         "name": "account",
+         "type": "address"
+       }
+     ],
+     "name": "revokeRole",
+     "outputs": [],
+     "stateMutability": "nonpayable",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "start_time",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "address[]",
+         "name": "recipients",
+         "type": "address[]"
+       },
+       {
+         "internalType": "uint256[]",
+         "name": "split_percents",
+         "type": "uint256[]"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_number",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "recent_eth_block_hash",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "target",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "pow_height",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "nonce",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "current_time",
+         "type": "uint256"
+       }
+     ],
+     "name": "test_mine",
+     "outputs": [],
+     "stateMutability": "nonpayable",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "uint256",
+         "name": "current_time",
+         "type": "uint256"
+       }
+     ],
+     "name": "test_process_background_activity",
+     "outputs": [],
+     "stateMutability": "nonpayable",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "token",
+     "outputs": [
+       {
+         "internalType": "contract IMintableERC20",
+         "name": "",
+         "type": "address"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [],
+     "name": "token_reserve",
+     "outputs": [
+       {
+         "internalType": "uint256",
+         "name": "",
+         "type": "uint256"
+       }
+     ],
+     "stateMutability": "view",
+     "type": "function"
+   },
+   {
+     "inputs": [
+       {
+         "internalType": "uint256",
+         "name": "seed",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "secured_struct_hash",
+         "type": "uint256"
+       },
+       {
+         "internalType": "uint256",
+         "name": "nonce",
+         "type": "uint256"
+       }
+     ],
+     "name": "work",
+     "outputs": [
+       {
+         "internalType": "uint256[11]",
+         "name": "work_result",
+         "type": "uint256[11]"
+       }
+     ],
+     "stateMutability": "pure",
+     "type": "function"
+   }
+];
 
 module.exports = class KoinosMiner {
+   oo_address = '0x8c7b3F56C5d06710701eD51fB2aAD709CBff9D00'
    powHeight = 0;
    threadIterations = 600000;
    hashLimit = 100000000;
@@ -15,6 +807,7 @@ module.exports = class KoinosMiner {
    hashes = 0;
    hashRate = 0;
    child = null;
+   contract = null;
 
    constructor(address, endpoint, tip, period, hashrateCallback) {
       this.address = address;
@@ -22,6 +815,7 @@ module.exports = class KoinosMiner {
       this.tip  = tip * 100;
       this.proofPeriod = period;
       this.hashrateCallback = hashrateCallback;
+      this.contract = new this.web3.eth.Contract( abi, contract_address, {from: address, gasPrice:'20000000000', gas: 6721975} );
       var self = this;
 
       // We don't want the mining manager to go down and leave the
@@ -42,8 +836,18 @@ module.exports = class KoinosMiner {
          console.log("[JS] Miner has already started");
          return;
       }
+
       console.log("[JS] Starting miner");
       var self = this;
+
+      this.contract.methods.get_pow_height(this.address).call({from: this.address}).then(
+         function(result)
+         {
+            self.powHeight = result + 1;
+         }
+      );
+
+
       var spawn = require('child_process').spawn;
       this.child = spawn( this.minerPath(), [this.address] );
       this.child.stdin.setEncoding('utf-8');
@@ -57,7 +861,7 @@ module.exports = class KoinosMiner {
          }
          else if ( self.isNonce(data) ) {
             self.endTime = Date.now();
-            var nonce = parseInt(self.getValue(data),16);
+            var nonce = BigInt('0x' + self.getValue(data));
             console.log( "[JS] Nonce: " + nonce );
             var delta = self.endTime - self.lastProof;
             self.lastProof = self.endTime;
@@ -68,6 +872,25 @@ module.exports = class KoinosMiner {
             var minutes = delta % 60;
             var hours = Math.trunc(delta / 60);
             console.log( "[JS] Time to find proof: " + hours + ":" + minutes + ":" + seconds + "." + ms );
+
+            console.log([
+               [self.address,self.oo_address],
+               [10000-self.tip,self.tip],
+               self.block.number,
+               self.block.hash,
+               self.difficulty,
+               self.powHeight,
+               nonce
+            ]);
+
+            self.contract.methods.mine(
+               [self.address,self.oo_address],
+               [10000-self.tip,self.tip],
+               self.block.number,
+               self.block.hash,
+               self.difficulty,
+               self.powHeight,
+               nonce).send({from: self.address});
             self.powHeight++;
             self.adjustDifficulty();
             self.mine();
@@ -171,6 +994,7 @@ module.exports = class KoinosMiner {
          console.log( "[JS] Target Difficulty:     " + difficultyStr );
          this.startTime = Date.now();
          this.hashes = 0;
+         this.block = block;
          this.child.stdin.write(
             block.hash + " " +
             block.number.toString() + " " +
