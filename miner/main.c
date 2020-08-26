@@ -298,12 +298,24 @@ int main( int argc, char** argv )
       bignum_from_string( &ss.miner_address, argv[1] , strlen(argv[1]) );
    }
 
+   if( is_hex_prefixed( argv[2] ) )
+   {
+      bignum_from_string( &ss.oo_address, argv[2] + 2, strlen(argv[2]) - 2 );
+   }
+   else
+   {
+      bignum_from_string( &ss.oo_address, argv[2], strlen(argv[2]) );
+   }
 
    bignum_to_string( &ss.miner_address, bn_str, sizeof(bn_str), false );
    fprintf(stderr, "[C] Miner Address: %s\n", bn_str);
+
+   bignum_to_string( &ss.oo_address, bn_str, sizeof(bn_str), false );
+   fprintf(stderr, "[C] OpenOrchard Address: %s\n", bn_str);
    fflush(stderr);
 
    bignum_endian_swap( &ss.miner_address );
+   bignum_endian_swap( &ss.oo_address );
 
    while ( true )
    {
@@ -320,12 +332,11 @@ int main( int argc, char** argv )
 
       bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
       bignum_endian_swap( &ss.miner_percent );
-      bignum_from_string( &ss.oo_address, "8c7b3F56C5d06710701eD51fB2aAD709CBff9D00", 40 );
-      bignum_endian_swap( &ss.oo_address );
       bignum_from_int( &ss.oo_percent, input.tip );
       bignum_endian_swap( &ss.oo_percent );
       bignum_from_int( &ss.recent_eth_block_number, input.block_num );
       bignum_endian_swap( &ss.recent_eth_block_number );
+
       if( is_hex_prefixed( input.block_hash ) )
       {
          bignum_from_string( &ss.recent_eth_block_hash, input.block_hash + 2, ETH_HASH_SIZE - 2 );

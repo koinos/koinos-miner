@@ -31,6 +31,9 @@ let hashrateCallback = function(hashrate) {
     console.log(`[JS](app.js) Hashrate: ${hashrate}`)
 }
 
-var miner = new KoinosMiner(program.addr, program.endpoint, program.tip, program.proofPeriod, hashrateCallback)
+const oo_address       = '0x0e27703cB52CD4a9206B1Dc58a816CEE09Ab885e';
+const contract_address = '0x4F744bAEE596D8F47d39a7AeEa93E882F4CBBD6b'
+
+var miner = new KoinosMiner(program.addr, oo_address, contract_address, program.endpoint, program.tip, program.proofPeriod, hashrateCallback)
 
 miner.start();
