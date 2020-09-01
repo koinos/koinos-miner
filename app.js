@@ -28,7 +28,7 @@ console.log(``);
 let KoinosMiner = require('.');
 
 let hashrateCallback = function(hashrate) {
-    console.log(`[JS](app.js) Hashrate: ${hashrate}`)
+    console.log(`[JS](app.js) Hashrate: ` + KoinosMiner.formatHashrate(hashrate));
 }
 
 const oo_address       = '0x0e27703cB52CD4a9206B1Dc58a816CEE09Ab885e';
