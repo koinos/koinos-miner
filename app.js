@@ -28,7 +28,7 @@ console.log(``);
 let KoinosMiner = require('.');
 
 let hashrateCallback = function(hashrate) {
-    console.log(`[JS](app.js) Hashrate: ${hashrate}`)
+    console.log(`[JS](app.js) Hashrate: ` + KoinosMiner.formatHashrate(hashrate));
 }
 
 var miner = new KoinosMiner(program.addr, program.endpoint, program.tip, program.proofPeriod, hashrateCallback)

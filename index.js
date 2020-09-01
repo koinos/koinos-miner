@@ -33,7 +33,7 @@ module.exports = class KoinosMiner {
          if (self.child !== null) {
             self.stop();
          }
-         process.exit(1)
+         throw err;
       });
    }
 
@@ -96,7 +96,7 @@ module.exports = class KoinosMiner {
    }
 
    minerPath() {
-      var miner = process.cwd() + '/bin/koinos_miner';
+      var miner = __dirname + '/bin/koinos_miner';
       if ( process.platform === "win32" ) {
          miner += '.exe';
       }
@@ -134,7 +134,7 @@ module.exports = class KoinosMiner {
       }
 
       if (this.hashrateCallback && typeof this.hashrateCallback === "function") {
-         this.hashrateCallback(this.formatHashrate(this.hashRate));
+         this.hashrateCallback(this.hashRate);
       }
    }
 
@@ -148,7 +148,7 @@ module.exports = class KoinosMiner {
       this.hashLimit = this.hashRate * 60 * 30; // Hashes for 30 minutes
    }
 
-   formatHashrate(h) {
+   static formatHashrate(h) {
       var units = ""
       switch( Math.trunc(Math.log10(h) / 3) ) {
          case 0:
