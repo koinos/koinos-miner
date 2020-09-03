@@ -1,8 +1,10 @@
+
 #include "bn.h"
 #include "keccak256.h"
 
 #include <inttypes.h>
 #include <omp.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -157,22 +159,22 @@ void read_data( struct input_data* d )
    } while ( strlen(buf) == 0 || buf[strlen(buf)-1] != ';' );
 
    fprintf(stderr, "[C] Buffer: %s\n", buf);
-   sscanf(buf, "%66s %llu %66s %llu %llu %llu %llu",
+   sscanf(buf, "%66s %" SCNu64 " %66s %" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64,
       d->block_hash,
       &d->block_num,
-      &d->difficulty_str,
+      d->difficulty_str,
       &d->tip,
       &d->pow_height,
       &d->thread_iterations,
       &d->hash_limit);
 
    fprintf(stderr, "[C] Ethereum Block Hash: %s\n", d->block_hash );
-   fprintf(stderr, "[C] Ethereum Block Number: %llu\n", d->block_num );
+   fprintf(stderr, "[C] Ethereum Block Number: %" PRIu64 "\n", d->block_num );
    fprintf(stderr, "[C] Difficulty Target: %s\n", d->difficulty_str );
-   fprintf(stderr, "[C] OpenOrchard Tip: %llu\n", d->tip );
-   fprintf(stderr, "[C] PoW Height: %llu\n", d->pow_height );
-   fprintf(stderr, "[C] Thread Iterations: %llu\n", d->thread_iterations );
-   fprintf(stderr, "[C] Hash Limit: %llu\n", d->hash_limit );
+   fprintf(stderr, "[C] OpenOrchard Tip: %" PRIu64 "\n", d->tip );
+   fprintf(stderr, "[C] PoW Height: %" PRIu64 "\n", d->pow_height );
+   fprintf(stderr, "[C] Thread Iterations: %" PRIu64 "\n", d->thread_iterations );
+   fprintf(stderr, "[C] Hash Limit: %" PRIu64 "\n", d->hash_limit );
    fflush(stderr);
 }
 
@@ -326,8 +328,8 @@ int main( int argc, char** argv )
       uint64_t miner_pay = PERCENT_100 - input.tip;
       uint64_t oo_pay    = input.tip;
 
-      fprintf(stderr, "[C] Miner pay: %llu\n", miner_pay);
-      fprintf(stderr, "[C] OpenOrchard tip: %llu\n", oo_pay);
+      fprintf(stderr, "[C] Miner pay: %" PRIu64 "\n", miner_pay);
+      fprintf(stderr, "[C] OpenOrchard tip: %" PRIu64 "\n", oo_pay);
       fflush(stderr);
 
       bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
