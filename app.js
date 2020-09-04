@@ -32,8 +32,10 @@ let hashrateCallback = function(hashrate) {
 }
 
 const oo_address       = '0x0e27703cB52CD4a9206B1Dc58a816CEE09Ab885e';
-const contract_address = '0x4F744bAEE596D8F47d39a7AeEa93E882F4CBBD6b'
+const contract_address = '0xc4e86fB87ddBC4e397cE6B066e16640F433d3592';
+// This was generated key for development. Don't actually use it.
+const private_key      = '0xad95424746d6ff37d4aea24c07759a70fffdbc68a82ac4a24163615903caa782';
 
-var miner = new KoinosMiner(program.addr, oo_address, contract_address, program.endpoint, program.tip, program.proofPeriod, hashrateCallback)
+var miner = new KoinosMiner(program.addr, oo_address, contract_address, program.endpoint, program.tip, program.proofPeriod, hashrateCallback, private_key)
 
 miner.start();

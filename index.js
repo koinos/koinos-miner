@@ -1,6 +1,7 @@
 'use strict';
 
 var Web3 = require('web3');
+var Tx = require('ethereumjs-tx').Transaction;
 const os = require('os');
 const abi = require('./abi.js')
 
@@ -18,14 +19,16 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, oo_address, contract_address, endpoint, tip, period, hashrateCallback) {
+   constructor(address, oo_address, contract_address, endpoint, tip, period, hashrateCallback, private_key) {
       this.address = address;
       this.oo_address = oo_address;
       this.web3 = new Web3( endpoint );
       this.tip  = tip * 100;
       this.proofPeriod = period;
       this.hashrateCallback = hashrateCallback;
-      this.contract = new this.web3.eth.Contract( abi, contract_address, {from: address, gasPrice:'20000000000', gas: 6721975} );
+      this.from_account = this.web3.eth.accounts.privateKeyToAccount(private_key);
+      this.contract_address = contract_address;
+      this.contract = new this.web3.eth.Contract( abi, this.contract_address, {from: this.from_account.address, gasPrice:'20000000000', gas: 200000} );
       var self = this;
 
       // We don't want the mining manager to go down and leave the
@@ -50,7 +53,7 @@ module.exports = class KoinosMiner {
       console.log("[JS] Starting miner");
       var self = this;
 
-      this.contract.methods.get_pow_height(this.address).call({from: this.address}).then(
+      this.contract.methods.get_pow_height(this.address).call().then(
          function(result)
          {
             self.powHeight = parseInt(result) + 1;
@@ -83,24 +86,24 @@ module.exports = class KoinosMiner {
             var hours = Math.trunc(delta / 60);
             console.log( "[JS] Time to find proof: " + hours + ":" + minutes + ":" + seconds + "." + ms );
 
-            console.log([
-               [self.address,self.oo_address],
-               [10000-self.tip,self.tip],
-               self.block.number,
-               self.block.hash,
-               '0x' + self.difficulty.toString(16),
-               self.powHeight,
-               '0x' + nonce.toString(16)
-            ]);
+            self.web3.eth.accounts.signTransaction({
+               from: self.from_account.address,
+               to: self.contract_address,
+               gas: 200000,
+               data: self.contract.methods.mine(
+                  [self.address,self.oo_address],
+                  [10000-self.tip,self.tip],
+                  self.block.number,
+                  self.block.hash,
+                  '0x' + self.difficulty.toString(16),
+                  self.powHeight,
+                  '0x' + nonce.toString(16)
+               ).encodeABI()
+            }, self.from_account.privateKey).then( (signedTx) => {
+               console.log(signedTx);
+               const sentTx = self.web3.eth.sendSignedTransaction(signedTx.raw || signedTx.rawTransaction);
+            });
 
-            self.contract.methods.mine(
-               [self.address,self.oo_address],
-               [10000-self.tip,self.tip],
-               self.block.number,
-               self.block.hash,
-               '0x' + self.difficulty.toString(16),
-               self.powHeight,
-               '0x' + nonce.toString(16)).send({from: self.address});
             self.powHeight++;
             self.adjustDifficulty();
             self.mine();
