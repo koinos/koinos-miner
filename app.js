@@ -28,12 +28,17 @@ console.log(``);
 let KoinosMiner = require('.');
 
 let hashrateCallback = function(hashrate) {
-    console.log(`[JS](app.js) Hashrate: ` + KoinosMiner.formatHashrate(hashrate));
+   console.log(`[JS](app.js) Hashrate: ` + KoinosMiner.formatHashrate(hashrate));
 }
 
-const oo_address       = '0x0e27703cB52CD4a9206B1Dc58a816CEE09Ab885e';
-const contract_address = '0x4F744bAEE596D8F47d39a7AeEa93E882F4CBBD6b'
+let proofCallback = function(submission) {
+   console.log(`[JS](app.js) Proof:`);
+   console.log(submission);
+}
 
-var miner = new KoinosMiner(program.addr, oo_address, contract_address, program.endpoint, program.tip, program.proofPeriod, hashrateCallback)
+const oo_address       = '0xCd06f2eb4E5424f9681bA07CB3C7487FEc0341EC';
+const contract_address = '0x536D49f3a0498A9E38FA3D90Df828Dc5BFc7c7F4';
+
+var miner = new KoinosMiner(program.addr, oo_address, contract_address, program.endpoint, program.tip, program.proofPeriod, hashrateCallback, proofCallback)
 
 miner.start();
