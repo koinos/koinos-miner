@@ -18,14 +18,14 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, oo_address, contract_address, endpoint, tip, period, hashrateCallback, proofSubmissionCallback) {
+   constructor(address, oo_address, contract_address, endpoint, tip, period, hashrateCallback, proofCallback) {
       this.address = address;
       this.oo_address = oo_address;
       this.web3 = new Web3( endpoint );
       this.tip  = tip * 100;
       this.proofPeriod = period;
       this.hashrateCallback = hashrateCallback;
-      this.proofSubmissionCallback = proofSubmissionCallback;
+      this.proofCallback = proofCallback;
       this.contract = new this.web3.eth.Contract( abi, contract_address, {from: address, gasPrice:'20000000000', gas: 6721975} );
       var self = this;
 
@@ -103,12 +103,13 @@ module.exports = class KoinosMiner {
                '0x' + self.difficulty.toString(16),
                self.powHeight,
                '0x' + nonce.toString(16)).send({from: self.address});
+
             self.powHeight++;
             self.adjustDifficulty();
             self.mine();
 
-            if (this.proofSubmissionCallback && typeof this.proofSubmissionCallback === "function") {
-               this.proofSubmissionCallback(submission);
+            if (self.proofCallback && typeof self.proofCallback === "function") {
+               self.proofCallback(submission);
             }
          }
          else if ( self.isHashReport(data) ) {

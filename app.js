@@ -31,14 +31,14 @@ let hashrateCallback = function(hashrate) {
    console.log(`[JS](app.js) Hashrate: ` + KoinosMiner.formatHashrate(hashrate));
 }
 
-let proofSubmissionCallback = function(submission) {
-   console.log("Callback!");
-   console.log(submissions);
+let proofCallback = function(submission) {
+   console.log(`[JS](app.js) Proof:`);
+   console.log(submission);
 }
 
-const oo_address       = '0x0e27703cB52CD4a9206B1Dc58a816CEE09Ab885e';
-const contract_address = '0x4F744bAEE596D8F47d39a7AeEa93E882F4CBBD6b'
+const oo_address       = '0xCd06f2eb4E5424f9681bA07CB3C7487FEc0341EC';
+const contract_address = '0x536D49f3a0498A9E38FA3D90Df828Dc5BFc7c7F4';
 
-var miner = new KoinosMiner(program.addr, oo_address, contract_address, program.endpoint, program.tip, program.proofPeriod, hashrateCallback, proofSubmissionCallback)
+var miner = new KoinosMiner(program.addr, oo_address, contract_address, program.endpoint, program.tip, program.proofPeriod, hashrateCallback, proofCallback)
 
 miner.start();
