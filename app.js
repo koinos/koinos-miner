@@ -46,6 +46,8 @@ let hashrateCallback = function(hashrate)
    console.log(`[JS](app.js) Hashrate: ` + KoinosMiner.formatHashrate(hashrate));
 }
 
+let proofCallback = function(submission) {}
+
 let signCallback = function(web3, txData)
 {
    return web3.eth.accounts.signTransaction(txData, account.privateKey)
@@ -144,6 +146,6 @@ else
    console.log('Created new Ethereum address: ' + account.address);
 }
 
-var miner = new KoinosMiner(program.addr, oo_address, account.address, contract_address, program.endpoint, program.tip, program.proofPeriod, signCallback, hashrateCallback)
+var miner = new KoinosMiner(program.addr, oo_address, account.address, contract_address, program.endpoint, program.tip, program.proofPeriod, signCallback, hashrateCallback, proofCallback)
 
 miner.start();
