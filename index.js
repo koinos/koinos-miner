@@ -18,13 +18,14 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, oo_address, contract_address, endpoint, tip, period, hashrateCallback) {
+   constructor(address, oo_address, contract_address, endpoint, tip, period, hashrateCallback, proofSubmissionCallback) {
       this.address = address;
       this.oo_address = oo_address;
       this.web3 = new Web3( endpoint );
       this.tip  = tip * 100;
       this.proofPeriod = period;
       this.hashrateCallback = hashrateCallback;
+      this.proofSubmissionCallback = proofSubmissionCallback;
       this.contract = new this.web3.eth.Contract( abi, contract_address, {from: address, gasPrice:'20000000000', gas: 6721975} );
       var self = this;
 
@@ -83,7 +84,8 @@ module.exports = class KoinosMiner {
             var hours = Math.trunc(delta / 60);
             console.log( "[JS] Time to find proof: " + hours + ":" + minutes + ":" + seconds + "." + ms );
 
-            console.log([
+
+            var submission = [
                [self.address,self.oo_address],
                [10000-self.tip,self.tip],
                self.block.number,
@@ -91,7 +93,7 @@ module.exports = class KoinosMiner {
                '0x' + self.difficulty.toString(16),
                self.powHeight,
                '0x' + nonce.toString(16)
-            ]);
+            ];
 
             self.contract.methods.mine(
                [self.address,self.oo_address],
@@ -104,6 +106,10 @@ module.exports = class KoinosMiner {
             self.powHeight++;
             self.adjustDifficulty();
             self.mine();
+
+            if (this.proofSubmissionCallback && typeof this.proofSubmissionCallback === "function") {
+               this.proofSubmissionCallback(submission);
+            }
          }
          else if ( self.isHashReport(data) ) {
             var ret = self.getValue(data).split(" ");
