@@ -103,10 +103,13 @@ if (program.import)
          charlist: '$<0-9>$<A-F>$<a-f>x'
    }));
 
-   var cipherText = encrypt(account.privateKey, enterPassword());
+   if(readlineSync.keyInYNStrict('Do you want to store your private key encrypted on disk?'))
+   {
+      var cipherText = encrypt(account.privateKey, enterPassword());
 
-   var filename = readlineSync.question('Where do you want to save the encrypted private key? ');
-   fs.writeFileSync(filename, cipherText);
+      var filename = readlineSync.question('Where do you want to save the encrypted private key? ');
+      fs.writeFileSync(filename, cipherText);
+   }
 
    console.log('Imported Ethereum address: ' + account.address);
 }
