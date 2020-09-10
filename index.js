@@ -183,7 +183,7 @@ module.exports = class KoinosMiner {
       this.hashRate = Math.max(this.hashRate, 1);
       var hashesPerPeriod = this.hashRate * parseInt(this.proofPeriod);
       this.difficulty = maxHash / BigInt(Math.trunc(hashesPerPeriod));
-      this.threadIterations = Math.max(this.hashRate / os.cpus().length, 1); // Per thread hash rate
+      this.threadIterations = Math.max(this.hashRate / (2 * os.cpus().length), 1); // Per thread hash rate, sync twice a second
       this.hashLimit = this.hashRate * 60 * 30; // Hashes for 30 minutes
    }
 

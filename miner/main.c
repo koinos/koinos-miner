@@ -26,7 +26,7 @@
 
 #define THREAD_ITERATIONS 600000
 
-#define HASH_REPORT_THRESHOLD 0
+#define HASH_REPORT_THRESHOLD 1
 
 int to_hex_string( unsigned char* n, unsigned char* dest, int len )
 {
