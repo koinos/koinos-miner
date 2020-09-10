@@ -26,6 +26,8 @@
 
 #define THREAD_ITERATIONS 600000
 
+#define HASH_REPORT_THRESHOLD 0
+
 int to_hex_string( unsigned char* n, unsigned char* dest, int len )
 {
    static const char hex[16] = {'0','1','2','3','4','5','6','7','8','9','a','b','c','d','e','f'};
@@ -420,7 +422,7 @@ int main( int argc, char** argv )
             {
                if( omp_get_thread_num() == 0 )
                {
-                  if( hash_report_counter >= 10 )
+                  if( hash_report_counter >= HASH_REPORT_THRESHOLD )
                   {
                      time( &timer );
                      timeinfo = localtime( &timer );
