@@ -48,9 +48,9 @@ let hashrateCallback = function(hashrate)
 
 let proofCallback = function(submission) {}
 
-let signCallback = function(web3, txData)
+let signCallback = async function(web3, txData)
 {
-   return web3.eth.accounts.signTransaction(txData, account.privateKey)
+   return (await web3.eth.accounts.signTransaction(txData, account.privateKey)).rawTransaction;
 }
 
 function enterPassword()

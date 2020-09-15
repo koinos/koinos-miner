@@ -110,8 +110,8 @@ module.exports = class KoinosMiner {
                   self.powHeight,
                   '0x' + nonce.toString(16)
                ).encodeABI()
-            }).then( (signedTx) => {
-               self.web3.eth.sendSignedTransaction(signedTx.raw || signedTx.rawTransaction);
+            }).then( (rawTx) => {
+               self.web3.eth.sendSignedTransaction(rawTx);
             });
 
             self.powHeight++;
