@@ -448,24 +448,29 @@ let abi =
      "type": "function"
    },
    {
-     "inputs": [
-       {
-         "internalType": "address",
-         "name": "miner",
-         "type": "address"
-       }
-     ],
-     "name": "get_pow_height",
-     "outputs": [
-       {
-         "internalType": "uint256",
-         "name": "",
-         "type": "uint256"
-       }
-     ],
-     "stateMutability": "view",
-     "type": "function"
-   },
+      "inputs": [
+        {
+          "internalType": "address[]",
+          "name": "recipients",
+          "type": "address[]"
+        },
+        {
+          "internalType": "uint256[]",
+          "name": "split_percents",
+          "type": "uint256[]"
+        }
+      ],
+      "name": "get_pow_height",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
    {
      "inputs": [
        {
