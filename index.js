@@ -55,7 +55,7 @@ module.exports = class KoinosMiner {
       console.log("[JS] Starting miner");
       var self = this;
 
-      await this.contract.methods.get_pow_height(this.address).call().then(
+      await this.contract.methods.get_pow_height(this.fromAddress, [this.address, this.oo_address], [10000 - this.tip, this.tip]).call().then(
          function(result)
          {
             self.powHeight = parseInt(result) + 1;
@@ -100,7 +100,7 @@ module.exports = class KoinosMiner {
             self.signCallback(self.web3, {
                from: self.fromAddress,
                to: self.contractAddress,
-               gas: 200000,
+               gas: (self.powHeight == 1 ? 500000 : 150000),
                gasPrice: parseInt(await self.web3.eth.getGasPrice()),
                data: self.contract.methods.mine(
                   [self.address,self.oo_address],
