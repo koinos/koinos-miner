@@ -450,6 +450,11 @@ let abi =
    {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "from",
+          "type": "address"
+        },
+        {
           "internalType": "address[]",
           "name": "recipients",
           "type": "address[]"

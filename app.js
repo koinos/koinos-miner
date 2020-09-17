@@ -35,7 +35,7 @@ var Web3 = require('web3');
 var fs = require('fs');
 
 const oo_address       = '0x0e27703cB52CD4a9206B1Dc58a816CEE09Ab885e';
-const contract_address = '0xdC65680511f046d72980637526fb7B6bC90724B2';
+const contract_address = '0x0e80f5ce0Fbf32781cA896f16217738aeFE2800F';
 
 var account;
 

@@ -55,7 +55,7 @@ module.exports = class KoinosMiner {
       console.log("[JS] Starting miner");
       var self = this;
 
-      await this.contract.methods.get_pow_height([this.address, this.oo_address], [10000 - this.tip, this.tip]).call().then(
+      await this.contract.methods.get_pow_height(this.fromAddress, [this.address, this.oo_address], [10000 - this.tip, this.tip]).call().then(
          function(result)
          {
             self.powHeight = parseInt(result) + 1;
