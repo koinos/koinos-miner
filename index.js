@@ -100,7 +100,7 @@ module.exports = class KoinosMiner {
             self.signCallback(self.web3, {
                from: self.fromAddress,
                to: self.contractAddress,
-               gas: 200000,
+               gas: (self.powHeight == 1 ? 500000 : 150000),
                gasPrice: parseInt(await self.web3.eth.getGasPrice()),
                data: self.contract.methods.mine(
                   [self.address,self.oo_address],

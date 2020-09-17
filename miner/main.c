@@ -484,7 +484,7 @@ int main( int argc, char** argv )
                hashes += input.thread_iterations;
             }
 
-            for( uint64_t i = 0; i < input.thread_iterations; i++ )
+            for( uint64_t i = 0; i < input.thread_iterations && !stop; i++ )
             {
                work( &t_result, &secured_struct_hash, &t_nonce, word_buffer );
 
@@ -495,6 +495,7 @@ int main( int argc, char** argv )
                      // Non-unique, do nothing
                      // This is normal
                      fprintf( stderr, "[C] Possible proof failed uniqueness check\n");
+                     bignum_inc( &t_nonce );
                   }
                   else
                   {
