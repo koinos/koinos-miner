@@ -66,7 +66,7 @@ module.exports = class KoinosMiner {
       this.child = spawn( this.minerPath(), [this.address, this.oo_address] );
       this.child.stdin.setEncoding('utf-8');
       this.child.stderr.pipe(process.stdout);
-      this.child.stdout.on('data', function (data) {
+      this.child.stdout.on('data', async function (data) {
          if ( self.isFinished(data) ) {
             self.endTime = Date.now();
             console.log("[JS] Finished!");
@@ -101,6 +101,7 @@ module.exports = class KoinosMiner {
                from: self.fromAddress,
                to: self.contractAddress,
                gas: 200000,
+               gasPrice: parseInt(await self.web3.eth.getGasPrice()),
                data: self.contract.methods.mine(
                   [self.address,self.oo_address],
                   [10000-self.tip,self.tip],
