@@ -233,6 +233,25 @@ void hash_secured_struct( struct bn* res, struct secured_struct* ss )
 }
 
 
+void find_word( struct bn* result, uint32_t x, uint32_t* coefficients, struct bn* word_buffer )
+{
+   uint64_t y = coefficients[4];
+   y *= x;
+   y += coefficients[3];
+   y %= WORD_BUFFER_LENGTH - 1;
+   y *= x;
+   y += coefficients[2];
+   y %= WORD_BUFFER_LENGTH - 1;
+   y *= x;
+   y += coefficients[1];
+   y %= WORD_BUFFER_LENGTH - 1;
+   y *= x;
+   y += coefficients[0];
+   y %= WORD_BUFFER_LENGTH - 1;
+   bignum_assign( result, word_buffer + y );
+}
+
+
 void find_and_xor_word( struct bn* result, uint32_t x, uint32_t* coefficients, struct bn* word_buffer )
 {
    uint64_t y = coefficients[4];
@@ -257,10 +276,6 @@ void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, 
    struct work_data wdata;
    init_work_data( &wdata, secured_struct_hash );
 
-   struct bn x;
-   struct bn y;
-   struct bn tmp;
-
    bignum_assign( result, secured_struct_hash ); // result = secured_struct_hash;
 
    uint32_t coefficients[5];
@@ -275,6 +290,33 @@ void work( struct bn* result, struct bn* secured_struct_hash, struct bn* nonce, 
    {
       find_and_xor_word( result, wdata.x[i], coefficients, word_buffer );
    }
+}
+
+
+int words_are_unique( struct bn* secured_struct_hash, struct bn* nonce, struct bn* word_buffer )
+{
+   struct work_data wdata;
+   struct bn w[sizeof(coprimes) / sizeof(uint32_t)];
+   init_work_data( &wdata, secured_struct_hash );
+
+   uint32_t coefficients[5];
+
+   int i, j;
+   for( i = 0; i < sizeof(coefficients) / sizeof(uint32_t); ++i )
+   {
+      coefficients[i] = 1 + bignum_mod_small( nonce, coprimes[i] );
+   }
+
+   for( i = 0; i < sizeof(coprimes) / sizeof(uint32_t); ++i )
+   {
+      find_word( w+i, wdata.x[i], coefficients, word_buffer );
+      for( j = 0; j < i; j++ )
+      {
+         if( bignum_cmp( w+i, w+j ) == 0 )
+            return 0;
+      }
+   }
+   return 1;
 }
 
 
@@ -448,20 +490,29 @@ int main( int argc, char** argv )
 
                if( bignum_cmp( &t_result, &ss.target ) <= 0)
                {
-                  #pragma omp crticial
+                  if( !words_are_unique( &secured_struct_hash, &t_nonce, word_buffer ) )
                   {
-                     // Two threads could find a valid proof at the same time (unlikely, but possible).
-                     // We want to return the more difficult proof
-                     if( !stop )
+                     // Non-unique, do nothing
+                     // This is normal
+                     fprintf( stderr, "[C] Possible proof failed uniqueness check\n");
+                  }
+                  else
+                  {
+                     #pragma omp crticial
                      {
-                        stop = true;
-                        bignum_assign( &result, &t_result );
-                        bignum_assign( &nonce, &t_nonce );
-                     }
-                     else if( bignum_cmp( &t_result, &result ) < 0 )
-                     {
-                        bignum_assign( &result, &t_result );
-                        bignum_assign( &nonce, &t_nonce );
+                        // Two threads could find a valid proof at the same time (unlikely, but possible).
+                        // We want to return the more difficult proof
+                        if( !stop )
+                        {
+                           stop = true;
+                           bignum_assign( &result, &t_result );
+                           bignum_assign( &nonce, &t_nonce );
+                        }
+                        else if( bignum_cmp( &t_result, &result ) < 0 )
+                        {
+                           bignum_assign( &result, &t_result );
+                           bignum_assign( &nonce, &t_nonce );
+                        }
                      }
                   }
                }
