@@ -14,6 +14,7 @@ module.exports = class KoinosMiner {
    startTime = Date.now();
    endTime = Date.now();
    lastProof = Date.now();
+   lastPowHeightUpdate = Date.now();
    hashes = 0;
    hashRate = 0;
    child = null;
@@ -42,7 +43,41 @@ module.exports = class KoinosMiner {
          if (self.child !== null) {
             self.stop();
          }
-         throw err;
+         let error = {
+            kMessage: "An uncaught exception was thrown.",
+            exception: err
+         }
+         throw error;
+      });
+   }
+
+   async retrievePowHeight() {
+      let self = this;
+      await this.contract.methods.get_pow_height(
+         this.fromAddress,
+         [this.address, this.oo_address],
+         [10000 - this.tip, this.tip]
+      ).call().then( (result) => {
+         self.powHeight = parseInt(result) + 1;
+         self.lastPowHeightUpdate = Date.now();
+         }
+      ).catch(e => {
+         let error = {
+            kMessage: "Could not retrieve the PoW height.",
+            exception: e
+         }
+         throw error;
+      });
+   }
+
+   sendTransaction(txData) {
+      var self = this;
+      self.signCallback(self.web3, txData).then( (rawTx) => {
+         self.web3.eth.sendSignedTransaction(rawTx).catch( async (error) => {
+            console.log('[JS] Error sending transaction:', error.message);
+            // If anything goes wrong, get a new powHeight
+            await self.retrievePowHeight();
+         });
       });
    }
 
@@ -55,12 +90,7 @@ module.exports = class KoinosMiner {
       console.log("[JS] Starting miner");
       var self = this;
 
-      await this.contract.methods.get_pow_height(this.fromAddress, [this.address, this.oo_address], [10000 - this.tip, this.tip]).call().then(
-         function(result)
-         {
-            self.powHeight = parseInt(result) + 1;
-         }
-      );
+      await this.retrievePowHeight();
 
       var spawn = require('child_process').spawn;
       this.child = spawn( this.minerPath(), [this.address, this.oo_address] );
@@ -71,6 +101,11 @@ module.exports = class KoinosMiner {
             self.endTime = Date.now();
             console.log("[JS] Finished!");
             self.adjustDifficulty();
+
+            // Check pow height every 10 minutes
+            if( Date.now() - self.lastPowHeightUpdate > 1000 * 60 * 10 ) {
+               self.retrievePowHeight();
+            }
             self.mine();
          }
          else if ( self.isNonce(data) ) {
@@ -97,7 +132,7 @@ module.exports = class KoinosMiner {
                '0x' + nonce.toString(16)
             ];
 
-            self.signCallback(self.web3, {
+            self.sendTransaction({
                from: self.fromAddress,
                to: self.contractAddress,
                gas: (self.powHeight == 1 ? 500000 : 150000),
@@ -111,12 +146,14 @@ module.exports = class KoinosMiner {
                   self.powHeight,
                   '0x' + nonce.toString(16)
                ).encodeABI()
-            }).then( (rawTx) => {
-               self.web3.eth.sendSignedTransaction(rawTx);
             });
 
+            // We will consider this a powHeight "update" to prevent immediately retrieving the old height
+            // and mining on it.
+            self.lastPowHeightUpdate = Date.now();
             self.powHeight++;
             self.adjustDifficulty();
+            this.startTime = Date.now();
             self.mine();
 
             if (self.proofCallback && typeof self.proofCallback === "function") {
@@ -131,7 +168,15 @@ module.exports = class KoinosMiner {
             self.hashes = newHashes;
             self.endTime = now;
          }
+         else {
+            let error = {
+               kMessage: 'Unrecognized response from the C mining application.'
+            };
+            throw error;
+         }
       });
+
+      this.startTime = Date.now();
       this.mine();
    }
 
@@ -195,7 +240,7 @@ module.exports = class KoinosMiner {
       var hashesPerPeriod = this.hashRate * parseInt(this.proofPeriod);
       this.difficulty = maxHash / BigInt(Math.trunc(hashesPerPeriod));
       this.threadIterations = Math.max(this.hashRate / (2 * os.cpus().length), 1); // Per thread hash rate, sync twice a second
-      this.hashLimit = this.hashRate * 60 * 30; // Hashes for 30 minutes
+      this.hashLimit = this.hashRate * 60 * 1; // Hashes for 1 minute
    }
 
    static formatHashrate(h) {
@@ -213,23 +258,38 @@ module.exports = class KoinosMiner {
    }
 
    async mine() {
-      this.web3.eth.getBlock("latest").then( (block) => {
-         var difficultyStr = this.difficulty.toString(16);
-         difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
-         console.log( "[JS] Ethereum Block Number: " + block.number );
-         console.log( "[JS] Ethereum Block Hash:   " + block.hash );
-         console.log( "[JS] Target Difficulty:     " + difficultyStr );
-         this.startTime = Date.now();
-         this.hashes = 0;
-         this.block = block;
-         this.child.stdin.write(
-            block.hash + " " +
-            block.number.toString() + " " +
-            difficultyStr + " " +
-            this.tip + " " +
-            this.powHeight + " " +
-            Math.trunc(this.threadIterations) + " " +
-            Math.trunc(this.hashLimit) + ";\n");
+      // get one block behind head block to try and void invalid mining from reorg
+      this.web3.eth.getBlock("latest").then( (headBlock) => {
+         this.web3.eth.getBlock(headBlock.number - 1).then( (block) => {
+            var difficultyStr = this.difficulty.toString(16);
+            difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
+            console.log( "[JS] Ethereum Block Number: " + block.number );
+            console.log( "[JS] Ethereum Block Hash:   " + block.hash );
+            console.log( "[JS] Target Difficulty:     " + difficultyStr );
+            this.hashes = 0;
+            this.block = block;
+            this.child.stdin.write(
+               block.hash + " " +
+               block.number.toString() + " " +
+               difficultyStr + " " +
+               this.tip + " " +
+               this.powHeight + " " +
+               Math.trunc(this.threadIterations) + " " +
+               Math.trunc(this.hashLimit) + ";\n");
+         })
+         .catch(e => {
+            let error = {
+               kMessage: "An error occurred while attempting to start the miner.",
+               exception: e
+            };
+            throw error;
+         });
+      }).catch(e => {
+         let error = {
+            kMessage: "An error occurred while attempting to start the miner.",
+            exception: e
+         }
+         throw error;
       });
    }
 }
