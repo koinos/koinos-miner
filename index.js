@@ -42,7 +42,11 @@ module.exports = class KoinosMiner {
          if (self.child !== null) {
             self.stop();
          }
-         throw err;
+         let error = {
+            kMessage: "An uncaught exception was thrown.",
+            exception: err
+         }
+         throw error;
       });
    }
 
@@ -60,7 +64,14 @@ module.exports = class KoinosMiner {
          {
             self.powHeight = parseInt(result) + 1;
          }
-      );
+      )
+      .catch(e => {
+         let error = {
+            kMessage: "Could not retrieve the PoW height.",
+            exception: e
+         }
+         throw error;
+      });
 
       var spawn = require('child_process').spawn;
       this.child = spawn( this.minerPath(), [this.address, this.oo_address] );
@@ -130,6 +141,12 @@ module.exports = class KoinosMiner {
             self.updateHashrate(newHashes - self.hashes, now - self.endTime);
             self.hashes = newHashes;
             self.endTime = now;
+         }
+         else {
+            let error = {
+               kMessage: 'Unrecognized response from the C mining application.'
+            };
+            throw error;
          }
       });
       this.mine();
@@ -230,6 +247,13 @@ module.exports = class KoinosMiner {
             this.powHeight + " " +
             Math.trunc(this.threadIterations) + " " +
             Math.trunc(this.hashLimit) + ";\n");
+      })
+      .catch(e => {
+         let error = {
+            kMessage: "An error occurred while attempting to start the miner.",
+            exception: e
+         };
+         throw error;
       });
    }
 }
