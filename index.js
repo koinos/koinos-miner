@@ -14,6 +14,7 @@ module.exports = class KoinosMiner {
    startTime = Date.now();
    endTime = Date.now();
    lastProof = Date.now();
+   lastPowHeightUpdate = Date.now();
    hashes = 0;
    hashRate = 0;
    child = null;
@@ -46,6 +47,29 @@ module.exports = class KoinosMiner {
       });
    }
 
+   async retrievePowHeight() {
+      let self = this;
+      await this.contract.methods.get_pow_height(
+         this.fromAddress,
+         [this.address, this.oo_address],
+         [10000 - this.tip, this.tip]).call().then( (result) => {
+            self.powHeight = parseInt(result) + 1;
+            self.lastPowHeightUpdate = Date.now();
+         }
+      );
+   }
+
+   sendTransaction(txData) {
+      var self = this;
+      self.signCallback(self.web3, txData).then( (rawTx) => {
+         self.web3.eth.sendSignedTransaction(rawTx).catch( async (error) => {
+            console.log('[JS] Error sending transaction:', error.message);
+            // If anything goes wrong, get a new powHeight
+            await self.retrievePowHeight();
+         });
+      });
+   }
+
    async start() {
       if (this.child !== null) {
          console.log("[JS] Miner has already started");
@@ -55,12 +79,7 @@ module.exports = class KoinosMiner {
       console.log("[JS] Starting miner");
       var self = this;
 
-      await this.contract.methods.get_pow_height(this.fromAddress, [this.address, this.oo_address], [10000 - this.tip, this.tip]).call().then(
-         function(result)
-         {
-            self.powHeight = parseInt(result) + 1;
-         }
-      );
+      await this.retrievePowHeight();
 
       var spawn = require('child_process').spawn;
       this.child = spawn( this.minerPath(), [this.address, this.oo_address] );
@@ -71,6 +90,11 @@ module.exports = class KoinosMiner {
             self.endTime = Date.now();
             console.log("[JS] Finished!");
             self.adjustDifficulty();
+
+            // Check pow height every 10 minutes
+            if( Date.now() - self.lastPowHeightUpdate > 1000 * 60 * 10 ) {
+               self.retrievePowHeight();
+            }
             self.mine();
          }
          else if ( self.isNonce(data) ) {
@@ -97,7 +121,7 @@ module.exports = class KoinosMiner {
                '0x' + nonce.toString(16)
             ];
 
-            self.signCallback(self.web3, {
+            self.sendTransaction({
                from: self.fromAddress,
                to: self.contractAddress,
                gas: (self.powHeight == 1 ? 500000 : 150000),
@@ -111,10 +135,11 @@ module.exports = class KoinosMiner {
                   self.powHeight,
                   '0x' + nonce.toString(16)
                ).encodeABI()
-            }).then( (rawTx) => {
-               self.web3.eth.sendSignedTransaction(rawTx);
             });
 
+            // We will consider this a powHeight "update" to prevent immediately retrieving the old height
+            // and mining on it.
+            self.lastPowHeightUpdate = Date.now();
             self.powHeight++;
             self.adjustDifficulty();
             this.startTime = Date.now();
