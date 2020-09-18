@@ -34,8 +34,8 @@ const crypto = require('crypto')
 var Web3 = require('web3');
 var fs = require('fs');
 
-const oo_address       = '0x0e27703cB52CD4a9206B1Dc58a816CEE09Ab885e';
-const contract_address = '0xf3E9d02f38254b66C964Ee50DC0BdfCb7de1C9af';
+const oo_address       = '0xC07d28f95FC1486088590a0667257b14d695a93b';
+const contract_address = '0xD5dD4afc0f9611FBC86f710943a503c374567d00';
 
 var account;
 
