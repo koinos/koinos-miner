@@ -35,6 +35,9 @@ if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas" )
 endif()
 
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c11" )
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11" )
+
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fopenmp")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -fopenmp")
 

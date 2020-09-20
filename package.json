@@ -6,11 +6,11 @@
   "scripts": {
     "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "rm -rf build && mkdir build && cd build && cmake  -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build"
+    "postinstall": "rm -rf build && mkdir build && cd build && cmake -G \"MinGW Makefiles\" -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/open-orchard/koinos-miner.git"
+    "url": "git+https://github.com/open-orchard/koinos-miner.git#mingw"
   },
   "keywords": [],
   "author": "OpenOrchard, Inc.",
