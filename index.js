@@ -20,7 +20,7 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, oo_address, fromAddress, contractAddress, endpoint, tip, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback) {
+   constructor(address, oo_address, fromAddress, contractAddress, endpoint, tip, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback) {
       this.address = address;
       this.oo_address = oo_address;
       this.web3 = new Web3( endpoint );
@@ -28,6 +28,7 @@ module.exports = class KoinosMiner {
       this.proofPeriod = period;
       this.signCallback = signCallback;
       this.hashrateCallback = hashrateCallback;
+      this.errorCallback = errorCallback;
       this.fromAddress = fromAddress;
       this.gasMultiplier = gasMultiplier;
       this.gasPriceLimit = gasPriceLimit;
@@ -49,7 +50,9 @@ module.exports = class KoinosMiner {
             kMessage: "An uncaught exception was thrown.",
             exception: err
          }
-         throw error;
+         if (self.errorCallback && typeof self.errorCallback === "function") {
+            self.errorCallback(error);
+         }
       });
    }
 
@@ -68,7 +71,9 @@ module.exports = class KoinosMiner {
             kMessage: "Could not retrieve the PoW height.",
             exception: e
          }
-         throw error;
+         if (self.errorCallback && typeof self.errorCallback === "function") {
+            self.errorCallback(error);
+         }
       });
    }
 
@@ -134,13 +139,15 @@ module.exports = class KoinosMiner {
                '0x' + nonce.toString(16)
             ];
 
-            let gasPrice = Math.round(parseInt(await self.web3.eth.getGasPrice()) * this.gasMultiplier);
+            let gasPrice = Math.round(parseInt(await self.web3.eth.getGasPrice()) * self.gasMultiplier);
 
-            if (gasPrice > this.gasPriceLimit) {
+            if (gasPrice > self.gasPriceLimit) {
                let error = {
-                  kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + this.gasPriceLimit + ")."
+                  kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + self.gasPriceLimit + ")."
                };
-               throw error;
+               if (self.errorCallback && typeof self.errorCallback === "function") {
+                  self.errorCallback(error);
+               }
             }
 
             self.sendTransaction({
@@ -183,7 +190,9 @@ module.exports = class KoinosMiner {
             let error = {
                kMessage: 'Unrecognized response from the C mining application.'
             };
-            throw error;
+            if (self.errorCallback && typeof self.errorCallback === "function") {
+               self.errorCallback(error);
+            }
          }
       });
 
@@ -269,6 +278,7 @@ module.exports = class KoinosMiner {
    }
 
    async mine() {
+      var self = this;
       // get one block behind head block to try and void invalid mining from reorg
       this.web3.eth.getBlock("latest").then( (headBlock) => {
          this.web3.eth.getBlock(headBlock.number - 1).then( (block) => {
@@ -293,14 +303,18 @@ module.exports = class KoinosMiner {
                kMessage: "An error occurred while attempting to start the miner.",
                exception: e
             };
-            throw error;
+            if (self.errorCallback && typeof self.errorCallback === "function") {
+               self.errorCallback(error);
+            }
          });
       }).catch(e => {
          let error = {
             kMessage: "An error occurred while attempting to start the miner.",
             exception: e
          }
-         throw error;
+         if (self.errorCallback && typeof self.errorCallback === "function") {
+            self.errorCallback(error);
+         }
       });
    }
 }

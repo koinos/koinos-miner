@@ -43,6 +43,10 @@ var account;
 
 var w3 = new Web3(process.endpoint);
 
+let errorCallback = function(error) {
+   console.log(`[JS](app.js) Error: ` + error);
+}
+
 let hashrateCallback = function(hashrate)
 {
    console.log(`[JS](app.js) Hashrate: ` + KoinosMiner.formatHashrate(hashrate));
@@ -163,6 +167,7 @@ var miner = new KoinosMiner(
    program.gasPriceLimit,
    signCallback,
    hashrateCallback,
-   proofCallback);
+   proofCallback,
+   errorCallback);
 
 miner.start();
