@@ -132,8 +132,8 @@ module.exports = class KoinosMiner {
             var submission = [
                [self.address,self.oo_address],
                [10000-self.tip,self.tip],
-               self.block.number,
-               self.block.hash,
+               self.recentBlock.number,
+               self.recentBlock.hash,
                '0x' + self.difficulty.toString(16),
                self.powHeight,
                '0x' + nonce.toString(16)
@@ -158,8 +158,8 @@ module.exports = class KoinosMiner {
                data: self.contract.methods.mine(
                   [self.address,self.oo_address],
                   [10000-self.tip,self.tip],
-                  self.block.number,
-                  self.block.hash,
+                  self.recentBlock.number,
+                  self.recentBlock.hash,
                   '0x' + self.difficulty.toString(16),
                   self.powHeight,
                   '0x' + nonce.toString(16)
@@ -277,26 +277,30 @@ module.exports = class KoinosMiner {
       }
    }
 
+   function writeMiningRequest(block) {
+      var difficultyStr = this.difficulty.toString(16);
+      difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
+      console.log( "[JS] Ethereum Block Number: " + block.number );
+      console.log( "[JS] Ethereum Block Hash:   " + block.hash );
+      console.log( "[JS] Target Difficulty:     " + difficultyStr );
+      this.hashes = 0;
+      this.block = block;
+      this.child.stdin.write(
+         block.hash + " " +
+         block.number.toString() + " " +
+         difficultyStr + " " +
+         this.tip + " " +
+         this.powHeight + " " +
+         Math.trunc(this.threadIterations) + " " +
+         Math.trunc(this.hashLimit) + ";\n");
+   }
+
    async mine() {
       var self = this;
       // get one block behind head block to try and void invalid mining from reorg
-      this.web3.eth.getBlock("latest").then( (headBlock) => {
-         this.web3.eth.getBlock(headBlock.number - 1).then( (block) => {
-            var difficultyStr = this.difficulty.toString(16);
-            difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
-            console.log( "[JS] Ethereum Block Number: " + block.number );
-            console.log( "[JS] Ethereum Block Hash:   " + block.hash );
-            console.log( "[JS] Target Difficulty:     " + difficultyStr );
-            this.hashes = 0;
-            this.block = block;
-            this.child.stdin.write(
-               block.hash + " " +
-               block.number.toString() + " " +
-               difficultyStr + " " +
-               this.tip + " " +
-               this.powHeight + " " +
-               Math.trunc(this.threadIterations) + " " +
-               Math.trunc(this.hashLimit) + ";\n");
+      self.web3.eth.getBlock("latest").then( (headBlock) => {
+         self.web3.eth.getBlock(headBlock.number - 1).then( (block) => {
+            self.writeMiningRequest(block)
          })
          .catch(e => {
             if (self.errorCallback && typeof self.errorCallback === "function") {
