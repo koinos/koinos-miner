@@ -12,6 +12,7 @@
 
 #ifdef _WIN32
 #include <io.h>
+#include <fcntl.h>
 #else
 #include <unistd.h>
 #endif
@@ -322,6 +323,10 @@ int words_are_unique( struct bn* secured_struct_hash, struct bn* nonce, struct b
 
 int main( int argc, char** argv )
 {
+   #ifdef _WIN32
+      _setmode( _fileno( stdin ), _O_BINARY );
+   #endif
+
    struct bn* word_buffer = malloc( WORD_BUFFER_BYTES );
    struct bn seed, bn_i;
 
