@@ -299,21 +299,13 @@ module.exports = class KoinosMiner {
                Math.trunc(this.hashLimit) + ";\n");
          })
          .catch(e => {
-            let error = {
-               kMessage: "An error occurred while attempting to start the miner.",
-               exception: e
-            };
             if (self.errorCallback && typeof self.errorCallback === "function") {
-               self.errorCallback(error);
+               self.errorCallback(e);
             }
          });
       }).catch(e => {
-         let error = {
-            kMessage: "An error occurred while attempting to start the miner.",
-            exception: e
-         }
          if (self.errorCallback && typeof self.errorCallback === "function") {
-            self.errorCallback(error);
+            self.errorCallback(e);
          }
       });
    }
