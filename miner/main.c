@@ -16,10 +16,6 @@
 #include <unistd.h>
 #endif
 
-#ifdef __linux__
-#include <sys/random.h>
-#endif
-
 #define WORD_BUFFER_BYTES  (2 << 20) // 2 MB
 #define WORD_BUFFER_LENGTH (WORD_BUFFER_BYTES / sizeof(struct bn))
 
@@ -141,6 +137,7 @@ struct input_data
    uint64_t pow_height;
    uint64_t thread_iterations;
    uint64_t hash_limit;
+   char     nonce_offset[ETH_HASH_SIZE + 1];
 };
 
 void read_data( struct input_data* d )
@@ -165,14 +162,15 @@ void read_data( struct input_data* d )
    } while ( strlen(buf) == 0 || buf[strlen(buf)-1] != ';' );
 
    fprintf(stderr, "[C] Buffer: %s\n", buf);
-   sscanf(buf, "%66s %" SCNu64 " %66s %" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64,
+   sscanf(buf, "%66s %" SCNu64 " %66s %" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64 " %66s",
       d->block_hash,
       &d->block_num,
       d->difficulty_str,
       &d->tip,
       &d->pow_height,
       &d->thread_iterations,
-      &d->hash_limit);
+      &d->hash_limit,
+      d->nonce_offset);
 
    fprintf(stderr, "[C] Ethereum Block Hash: %s\n", d->block_hash );
    fprintf(stderr, "[C] Ethereum Block Number: %" PRIu64 "\n", d->block_num );
@@ -181,6 +179,7 @@ void read_data( struct input_data* d )
    fprintf(stderr, "[C] PoW Height: %" PRIu64 "\n", d->pow_height );
    fprintf(stderr, "[C] Thread Iterations: %" PRIu64 "\n", d->thread_iterations );
    fprintf(stderr, "[C] Hash Limit: %" PRIu64 "\n", d->hash_limit );
+   fprintf(stderr, "[C] Nonce Offset: %s\n", d->nonce_offset );
    fflush(stderr);
 }
 
@@ -324,54 +323,6 @@ int words_are_unique( struct bn* secured_struct_hash, struct bn* nonce, struct b
 }
 
 
-void get_max_random_offset( struct bn* max_offset )
-{
-   struct bn one;
-   struct bn bn_2_64;
-   struct bn bn_2_128;
-   bignum_from_int( &one, 1 );
-   bignum_lshift( &one, &bn_2_64 ,  64 );
-   bignum_lshift( &one, &bn_2_128, 128 );
-   bignum_sub( &bn_2_128, &bn_2_64, max_offset );
-}
-
-void get_random_offset( struct bn* result )
-{
-#ifdef __linux__
-   /*
-      Construct a random offset between 0 and 2^128 - 2^64.
-      The purpose of this is to reduce possibility of collision when mining to the same addresses using multiple machines.
-   */
-   struct bn max_offset;
-   const size_t buflen = 128/8;
-   bignum_from_int( result, 0 );
-
-   get_max_random_offset( &max_offset );
-   while(1)
-   {
-      ssize_t num_bytes = getrandom( result, buflen, 0 );
-      if( num_bytes != buflen )
-      {
-         /* Bail if random bytes weren't available */
-         fprintf(stderr, "[C] getrandom() returned %d, expected %d\n", (int)num_bytes, (int)buflen );
-         return;
-      }
-
-      /* Reject if we get within 2^64 of the end */
-      if( bignum_cmp( result, &max_offset ) >= 0 )
-      {
-         fprintf(stderr, "[C] Generated offset greater than max_offset, retrying\n");
-         continue;
-      }
-
-      break;
-   }
-#else
-   bignum_from_int( result, 0 );
-#endif
-}
-
-
 int main( int argc, char** argv )
 {
    struct bn* word_buffer = malloc( WORD_BUFFER_BYTES );
@@ -493,7 +444,14 @@ int main( int argc, char** argv )
       bignum_endian_swap( &nonce );
 
       struct bn nonce_offset;
-      get_random_offset( &nonce_offset );
+      if( is_hex_prefixed( input.nonce_offset ) )
+      {
+         bignum_from_string( &nonce_offset, input.nonce_offset + 2, ETH_HASH_SIZE - 2 );
+      }
+      else
+      {
+         bignum_from_string( &nonce_offset, input.nonce_offset, ETH_HASH_SIZE - 2 );
+      }
       bignum_add( &nonce, &nonce_offset, &nonce );
 
       bignum_to_string( &nonce, bn_str, sizeof(bn_str), true );

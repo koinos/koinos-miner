@@ -3,7 +3,8 @@
 var Web3 = require('web3');
 var Tx = require('ethereumjs-tx').Transaction;
 const os = require('os');
-const abi = require('./abi.js')
+const abi = require('./abi.js');
+const crypto = require('crypto');
 
 module.exports = class KoinosMiner {
    powHeight = 0;
@@ -280,6 +281,43 @@ module.exports = class KoinosMiner {
       }
    }
 
+   bufToBigInt(buf) {
+      let result = 0n;
+      if( buf.length == 0 )
+         return result;
+      let s = BigInt(8*(buf.length - 1));
+      for( let i=0; i<buf.length; i++ )
+      {
+         result |= BigInt(buf[i]) << s;
+         s -= 8n;
+      }
+      return result;
+   }
+
+   getNonceOffset() {
+      // At most 2^128 - hashLimit
+      let maxOffset = (1n << 128n) - BigInt(Math.trunc(this.hashLimit));
+      let maxOffsetStr = maxOffset.toString(16);
+      maxOffsetStr = "0x" + "0".repeat(64 - maxOffsetStr.length) + maxOffsetStr;
+
+      console.log("[JS] maxOffset:", maxOffsetStr);
+      while( true )
+      {
+         // Reroll until we get something less than maxOffset
+         // Probability of needing a reroll is pretty tiny though
+         let rdata = crypto.randomBytes(16);
+         console.log("[JS] rdata:", rdata);
+         let x = this.bufToBigInt(rdata);
+         console.log("[JS] x:", x.toString(16));
+         if( x < maxOffset )
+         {
+            let xStr = x.toString(16);
+            xStr = "0x" + "0".repeat(64 - xStr.length) + xStr;
+            return xStr;
+         }
+      }
+   }
+
    writeMiningRequest(block) {
       var difficultyStr = this.difficulty.toString(16);
       difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
@@ -295,7 +333,8 @@ module.exports = class KoinosMiner {
          this.tip + " " +
          this.powHeight + " " +
          Math.trunc(this.threadIterations) + " " +
-         Math.trunc(this.hashLimit) + ";\n");
+         Math.trunc(this.hashLimit) + " " +
+         this.getNonceOffset() + ";\n");
    }
 
    async updateLatestBlock() {
