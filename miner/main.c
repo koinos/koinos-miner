@@ -138,6 +138,7 @@ struct input_data
    uint64_t pow_height;
    uint64_t thread_iterations;
    uint64_t hash_limit;
+   char     nonce_offset[ETH_HASH_SIZE + 1];
 };
 
 void read_data( struct input_data* d )
@@ -162,14 +163,15 @@ void read_data( struct input_data* d )
    } while ( strlen(buf) == 0 || buf[strlen(buf)-1] != ';' );
 
    fprintf(stderr, "[C] Buffer: %s\n", buf);
-   sscanf(buf, "%66s %" SCNu64 " %66s %" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64,
+   sscanf(buf, "%66s %" SCNu64 " %66s %" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64 " %66s",
       d->block_hash,
       &d->block_num,
       d->difficulty_str,
       &d->tip,
       &d->pow_height,
       &d->thread_iterations,
-      &d->hash_limit);
+      &d->hash_limit,
+      d->nonce_offset);
 
    fprintf(stderr, "[C] Ethereum Block Hash: %s\n", d->block_hash );
    fprintf(stderr, "[C] Ethereum Block Number: %" PRIu64 "\n", d->block_num );
@@ -178,6 +180,7 @@ void read_data( struct input_data* d )
    fprintf(stderr, "[C] PoW Height: %" PRIu64 "\n", d->pow_height );
    fprintf(stderr, "[C] Thread Iterations: %" PRIu64 "\n", d->thread_iterations );
    fprintf(stderr, "[C] Hash Limit: %" PRIu64 "\n", d->hash_limit );
+   fprintf(stderr, "[C] Nonce Offset: %s\n", d->nonce_offset );
    fflush(stderr);
 }
 
@@ -444,6 +447,17 @@ int main( int argc, char** argv )
       struct bn nonce;
       bignum_assign( &nonce, &ss.recent_eth_block_hash );
       bignum_endian_swap( &nonce );
+
+      struct bn nonce_offset;
+      if( is_hex_prefixed( input.nonce_offset ) )
+      {
+         bignum_from_string( &nonce_offset, input.nonce_offset + 2, ETH_HASH_SIZE - 2 );
+      }
+      else
+      {
+         bignum_from_string( &nonce_offset, input.nonce_offset, ETH_HASH_SIZE - 2 );
+      }
+      bignum_add( &nonce, &nonce_offset, &nonce );
 
       bignum_to_string( &nonce, bn_str, sizeof(bn_str), true );
       fprintf(stderr, "[C] Starting Nonce: %s\n", bn_str );
