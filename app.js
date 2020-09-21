@@ -10,6 +10,8 @@ program
    .option('-t, --tip <percent>', 'The percentage of mined coins to tip the developers', '5')
    .option('-p, --proof-period <seconds>', 'How often you want to submit a proof on average', '86400')
    .option('-k, --key-file <file>', 'AES encrypted file containing private key')
+   .option('-m, --gas-multiplier <multiplier>', 'The multiplier to apply to the recommended gas price', '1')
+   .option('-l, --gas-price-limit <limit>', 'The maximum amount of gas to be spent on a proof submission', '1000000000000')
    .option('--import', 'Import a private key')
    .option('--export', 'Export a private key')
    .parse(process.argv);
@@ -40,6 +42,10 @@ const contract_address = '0xD5dD4afc0f9611FBC86f710943a503c374567d00';
 var account;
 
 var w3 = new Web3(process.endpoint);
+
+let errorCallback = function(error) {
+   console.log(`[JS](app.js) Error: ` + error);
+}
 
 let hashrateCallback = function(hashrate)
 {
@@ -149,6 +155,19 @@ else
    console.log('Created new Ethereum address: ' + account.address);
 }
 
-var miner = new KoinosMiner(program.addr, oo_address, account.address, contract_address, program.endpoint, program.tip, program.proofPeriod, signCallback, hashrateCallback, proofCallback)
+var miner = new KoinosMiner(
+   program.addr,
+   oo_address,
+   account.address,
+   contract_address,
+   program.endpoint,
+   program.tip,
+   program.proofPeriod,
+   program.gasMultiplier,
+   program.gasPriceLimit,
+   signCallback,
+   hashrateCallback,
+   proofCallback,
+   errorCallback);
 
 miner.start();

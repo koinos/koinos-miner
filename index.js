@@ -20,7 +20,7 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, oo_address, fromAddress, contractAddress, endpoint, tip, period, signCallback, hashrateCallback, proofCallback ) {
+   constructor(address, oo_address, fromAddress, contractAddress, endpoint, tip, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback) {
       this.address = address;
       this.oo_address = oo_address;
       this.web3 = new Web3( endpoint );
@@ -28,7 +28,10 @@ module.exports = class KoinosMiner {
       this.proofPeriod = period;
       this.signCallback = signCallback;
       this.hashrateCallback = hashrateCallback;
+      this.errorCallback = errorCallback;
       this.fromAddress = fromAddress;
+      this.gasMultiplier = gasMultiplier;
+      this.gasPriceLimit = gasPriceLimit;
       this.contractAddress = contractAddress;
       this.proofCallback = proofCallback;
       this.contract = new this.web3.eth.Contract( abi, this.contractAddress );
@@ -47,7 +50,9 @@ module.exports = class KoinosMiner {
             kMessage: "An uncaught exception was thrown.",
             exception: err
          }
-         throw error;
+         if (self.errorCallback && typeof self.errorCallback === "function") {
+            self.errorCallback(error);
+         }
       });
    }
 
@@ -66,7 +71,9 @@ module.exports = class KoinosMiner {
             kMessage: "Could not retrieve the PoW height.",
             exception: e
          }
-         throw error;
+         if (self.errorCallback && typeof self.errorCallback === "function") {
+            self.errorCallback(error);
+         }
       });
    }
 
@@ -132,11 +139,22 @@ module.exports = class KoinosMiner {
                '0x' + nonce.toString(16)
             ];
 
+            let gasPrice = Math.round(parseInt(await self.web3.eth.getGasPrice()) * self.gasMultiplier);
+
+            if (gasPrice > self.gasPriceLimit) {
+               let error = {
+                  kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + self.gasPriceLimit + ")."
+               };
+               if (self.errorCallback && typeof self.errorCallback === "function") {
+                  self.errorCallback(error);
+               }
+            }
+
             self.sendTransaction({
                from: self.fromAddress,
                to: self.contractAddress,
                gas: (self.powHeight == 1 ? 500000 : 150000),
-               gasPrice: parseInt(await self.web3.eth.getGasPrice()),
+               gasPrice: gasPrice,
                data: self.contract.methods.mine(
                   [self.address,self.oo_address],
                   [10000-self.tip,self.tip],
@@ -172,7 +190,9 @@ module.exports = class KoinosMiner {
             let error = {
                kMessage: 'Unrecognized response from the C mining application.'
             };
-            throw error;
+            if (self.errorCallback && typeof self.errorCallback === "function") {
+               self.errorCallback(error);
+            }
          }
       });
 
@@ -258,6 +278,7 @@ module.exports = class KoinosMiner {
    }
 
    async mine() {
+      var self = this;
       // get one block behind head block to try and void invalid mining from reorg
       this.web3.eth.getBlock("latest").then( (headBlock) => {
          this.web3.eth.getBlock(headBlock.number - 1).then( (block) => {
@@ -278,18 +299,14 @@ module.exports = class KoinosMiner {
                Math.trunc(this.hashLimit) + ";\n");
          })
          .catch(e => {
-            let error = {
-               kMessage: "An error occurred while attempting to start the miner.",
-               exception: e
-            };
-            throw error;
+            if (self.errorCallback && typeof self.errorCallback === "function") {
+               self.errorCallback(e);
+            }
          });
       }).catch(e => {
-         let error = {
-            kMessage: "An error occurred while attempting to start the miner.",
-            exception: e
+         if (self.errorCallback && typeof self.errorCallback === "function") {
+            self.errorCallback(e);
          }
-         throw error;
       });
    }
 }
