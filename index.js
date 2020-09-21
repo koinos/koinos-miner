@@ -20,7 +20,7 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, oo_address, fromAddress, contractAddress, endpoint, tip, period, signCallback, hashrateCallback, proofCallback ) {
+   constructor(address, oo_address, fromAddress, contractAddress, endpoint, tip, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback) {
       this.address = address;
       this.oo_address = oo_address;
       this.web3 = new Web3( endpoint );
@@ -29,6 +29,8 @@ module.exports = class KoinosMiner {
       this.signCallback = signCallback;
       this.hashrateCallback = hashrateCallback;
       this.fromAddress = fromAddress;
+      this.gasMultiplier = gasMultiplier;
+      this.gasPriceLimit = gasPriceLimit;
       this.contractAddress = contractAddress;
       this.proofCallback = proofCallback;
       this.contract = new this.web3.eth.Contract( abi, this.contractAddress );
@@ -132,11 +134,20 @@ module.exports = class KoinosMiner {
                '0x' + nonce.toString(16)
             ];
 
+            let gasPrice = Math.round(parseInt(await self.web3.eth.getGasPrice()) * this.gasMultiplier);
+
+            if (gasPrice > this.gasPriceLimit) {
+               let error = {
+                  kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + this.gasPriceLimit + ")."
+               };
+               throw error;
+            }
+
             self.sendTransaction({
                from: self.fromAddress,
                to: self.contractAddress,
                gas: (self.powHeight == 1 ? 500000 : 150000),
-               gasPrice: parseInt(await self.web3.eth.getGasPrice()),
+               gasPrice: gasPrice,
                data: self.contract.methods.mine(
                   [self.address,self.oo_address],
                   [10000-self.tip,self.tip],
