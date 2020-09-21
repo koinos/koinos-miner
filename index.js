@@ -201,7 +201,7 @@ module.exports = class KoinosMiner {
 
    getValue(s) {
       let str = s.toString();
-      return str.substring(2, str.indexOf(";"));
+      return str.substring(2, str.indexOf(";")-2);
    }
 
    isFinished(s) {
