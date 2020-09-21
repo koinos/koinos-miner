@@ -16,6 +16,10 @@
 #include <unistd.h>
 #endif
 
+#ifdef __linux__
+#include <sys/random.h>
+#endif
+
 #define WORD_BUFFER_BYTES  (2 << 20) // 2 MB
 #define WORD_BUFFER_LENGTH (WORD_BUFFER_BYTES / sizeof(struct bn))
 
@@ -320,6 +324,54 @@ int words_are_unique( struct bn* secured_struct_hash, struct bn* nonce, struct b
 }
 
 
+void get_max_random_offset( struct bn* max_offset )
+{
+   struct bn one;
+   struct bn bn_2_64;
+   struct bn bn_2_128;
+   bignum_from_int( &one, 1 );
+   bignum_lshift( &one, &bn_2_64 ,  64 );
+   bignum_lshift( &one, &bn_2_128, 128 );
+   bignum_sub( &bn_2_128, &bn_2_64, max_offset );
+}
+
+void get_random_offset( struct bn* result )
+{
+#ifdef __linux__
+   /*
+      Construct a random offset between 0 and 2^128 - 2^64.
+      The purpose of this is to reduce possibility of collision when mining to the same addresses using multiple machines.
+   */
+   struct bn max_offset;
+   const size_t buflen = 128/8;
+   bignum_from_int( result, 0 );
+
+   get_max_random_offset( &max_offset );
+   while(1)
+   {
+      ssize_t num_bytes = getrandom( result, buflen, 0 );
+      if( num_bytes != buflen )
+      {
+         /* Bail if random bytes weren't available */
+         fprintf(stderr, "[C] getrandom() returned %d, expected %d\n", (int)num_bytes, (int)buflen );
+         return;
+      }
+
+      /* Reject if we get within 2^64 of the end */
+      if( bignum_cmp( result, &max_offset ) >= 0 )
+      {
+         fprintf(stderr, "[C] Generated offset greater than max_offset, retrying\n");
+         continue;
+      }
+
+      break;
+   }
+#else
+   bignum_from_int( result, 0 );
+#endif
+}
+
+
 int main( int argc, char** argv )
 {
    struct bn* word_buffer = malloc( WORD_BUFFER_BYTES );
@@ -439,6 +491,10 @@ int main( int argc, char** argv )
       struct bn nonce;
       bignum_assign( &nonce, &ss.recent_eth_block_hash );
       bignum_endian_swap( &nonce );
+
+      struct bn nonce_offset;
+      get_random_offset( &nonce_offset );
+      bignum_add( &nonce, &nonce_offset, &nonce );
 
       bignum_to_string( &nonce, bn_str, sizeof(bn_str), true );
       fprintf(stderr, "[C] Starting Nonce: %s\n", bn_str );
