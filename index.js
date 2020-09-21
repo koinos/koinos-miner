@@ -113,7 +113,8 @@ module.exports = class KoinosMiner {
             if( Date.now() - self.lastPowHeightUpdate > 1000 * 60 * 10 ) {
                self.retrievePowHeight();
             }
-            self.mine();
+            await self.updateLatestBlock();
+            self.writeMiningRequest(self.recentBlock);
          }
          else if ( self.isNonce(data) ) {
             self.endTime = Date.now();
@@ -171,8 +172,9 @@ module.exports = class KoinosMiner {
             self.lastPowHeightUpdate = Date.now();
             self.powHeight++;
             self.adjustDifficulty();
-            this.startTime = Date.now();
-            self.mine();
+            await self.updateLatestBlock();
+            self.startTime = Date.now();
+            self.writeMiningRequest(self.recentBlock);
 
             if (self.proofCallback && typeof self.proofCallback === "function") {
                self.proofCallback(submission);
@@ -196,8 +198,9 @@ module.exports = class KoinosMiner {
          }
       });
 
-      this.startTime = Date.now();
-      this.mine();
+      await self.updateLatestBlock();
+      self.startTime = Date.now();
+      self.writeMiningRequest(self.recentBlock);
    }
 
    stop() {
@@ -277,7 +280,7 @@ module.exports = class KoinosMiner {
       }
    }
 
-   function writeMiningRequest(block) {
+   writeMiningRequest(block) {
       var difficultyStr = this.difficulty.toString(16);
       difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
       console.log( "[JS] Ethereum Block Number: " + block.number );
@@ -295,22 +298,24 @@ module.exports = class KoinosMiner {
          Math.trunc(this.hashLimit) + ";\n");
    }
 
-   async mine() {
-      var self = this;
-      // get one block behind head block to try and void invalid mining from reorg
-      self.web3.eth.getBlock("latest").then( (headBlock) => {
-         self.web3.eth.getBlock(headBlock.number - 1).then( (block) => {
-            self.writeMiningRequest(block)
-         })
-         .catch(e => {
-            if (self.errorCallback && typeof self.errorCallback === "function") {
-               self.errorCallback(e);
-            }
-         });
-      }).catch(e => {
-         if (self.errorCallback && typeof self.errorCallback === "function") {
+   async updateLatestBlock() {
+      try
+      {
+         let headBlock = await this.web3.eth.getBlock("latest");
+         // get several blocks behind head block so most reorgs don't invalidate mining
+         let confirmedBlock = await this.web3.eth.getBlock(headBlock.number - 6 );
+         this.recentBlock = confirmedBlock;
+      }
+      catch( e )
+      {
+         if( self.errorCallback && typeof self.errorCallback === "function" ) {
             self.errorCallback(e);
          }
-      });
+         let error = {
+            kMessage: "An error occurred while attempting to start the miner.",
+            exception: e
+         };
+         throw error;
+      }
    }
 }
