@@ -24,6 +24,7 @@ if( ${FORCE_COLORED_OUTPUT} )
 endif ()
 
 set(CMAKE_CXX_STANDARD 17)
+set (CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -34,8 +35,6 @@ if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
    SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unknown-pragmas" )
    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas" )
 endif()
-
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c11" )
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread -fopenmp")
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -fopenmp")
