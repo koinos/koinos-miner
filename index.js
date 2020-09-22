@@ -50,7 +50,7 @@ module.exports = class KoinosMiner {
          let error = {
             kMessage: "An uncaught exception was thrown.",
             exception: err
-         }
+         };
          if (self.errorCallback && typeof self.errorCallback === "function") {
             self.errorCallback(error);
          }
@@ -58,24 +58,27 @@ module.exports = class KoinosMiner {
    }
 
    async retrievePowHeight() {
-      let self = this;
-      await this.contract.methods.get_pow_height(
-         this.fromAddress,
-         [this.address, this.oo_address],
-         [10000 - this.tip, this.tip]
-      ).call().then( (result) => {
+      try
+      {
+         let self = this;
+         let result = await this.contract.methods.get_pow_height(
+            this.fromAddress,
+            [this.address, this.oo_address],
+            [10000 - this.tip, this.tip]
+         ).call();
          self.powHeight = parseInt(result) + 1;
          self.lastPowHeightUpdate = Date.now();
-         }
-      ).catch(e => {
+      }
+      catch(e)
+      {
          let error = {
             kMessage: "Could not retrieve the PoW height.",
             exception: e
-         }
+         };
          if (self.errorCallback && typeof self.errorCallback === "function") {
             self.errorCallback(error);
          }
-      });
+      }
    }
 
    sendTransaction(txData) {
