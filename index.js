@@ -347,7 +347,7 @@ module.exports = class KoinosMiner {
       }
       catch( e )
       {
-         if( self.errorCallback && typeof self.errorCallback === "function" ) {
+         if( this.errorCallback && typeof this.errorCallback === "function" ) {
             self.errorCallback(e);
          }
          let error = {
