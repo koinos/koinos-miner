@@ -92,6 +92,91 @@ module.exports = class KoinosMiner {
       });
    }
 
+   async onRespFinished() {
+      this.endTime = Date.now();
+      console.log("[JS] Finished!");
+      this.adjustDifficulty();
+
+      // Check pow height every 10 minutes
+      if( Date.now() - this.lastPowHeightUpdate > 1000 * 60 * 10 ) {
+         this.retrievePowHeight();
+      }
+      await this.updateLatestBlock();
+      this.writeMiningRequest(this.recentBlock);
+   }
+
+   async onRespNonce(nonce) {
+      this.endTime = Date.now();
+      console.log( "[JS] Nonce: " + nonce );
+      var delta = this.endTime - this.lastProof;
+      this.lastProof = this.endTime;
+      var ms = delta % 1000;
+      delta = Math.trunc(delta / 1000);
+      var seconds = delta % 60;
+      delta = Math.trunc(delta / 60);
+      var minutes = delta % 60;
+      var hours = Math.trunc(delta / 60);
+      console.log( "[JS] Time to find proof: " + hours + ":" + minutes + ":" + seconds + "." + ms );
+
+      var submission = [
+         [this.address,this.oo_address],
+         [10000-this.tip,this.tip],
+         this.recentBlock.number,
+         this.recentBlock.hash,
+         '0x' + this.difficulty.toString(16),
+         this.powHeight,
+         '0x' + nonce.toString(16)
+      ];
+
+      let gasPrice = Math.round(parseInt(await this.web3.eth.getGasPrice()) * this.gasMultiplier);
+
+      if (gasPrice > this.gasPriceLimit) {
+         let error = {
+            kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + this.gasPriceLimit + ")."
+         };
+         if (this.errorCallback && typeof this.errorCallback === "function") {
+            this.errorCallback(error);
+         }
+      }
+
+      this.sendTransaction({
+         from: this.fromAddress,
+         to: this.contractAddress,
+         gas: (this.powHeight == 1 ? 500000 : 150000),
+         gasPrice: gasPrice,
+         data: this.contract.methods.mine(
+            [this.address,this.oo_address],
+            [10000-this.tip,this.tip],
+            this.recentBlock.number,
+            this.recentBlock.hash,
+            '0x' + this.difficulty.toString(16),
+            this.powHeight,
+            '0x' + nonce.toString(16)
+         ).encodeABI()
+      });
+
+      // We will consider this a powHeight "update" to prevent immediately retrieving the old height
+      // and mining on it.
+      this.lastPowHeightUpdate = Date.now();
+      this.powHeight++;
+      this.adjustDifficulty();
+      await this.updateLatestBlock();
+      this.startTime = Date.now();
+      this.writeMiningRequest(this.recentBlock);
+
+      if (this.proofCallback && typeof this.proofCallback === "function") {
+         this.proofCallback(submission);
+      }
+   }
+
+   async onRespHashReport( newHashes )
+   {
+      let now = Date.now();
+      this.updateHashrate(newHashes - this.hashes, now - this.endTime);
+      this.hashes = newHashes;
+      this.endTime = now;
+   }
+
    async start() {
       if (this.child !== null) {
          console.log("[JS] Miner has already started");
@@ -109,88 +194,16 @@ module.exports = class KoinosMiner {
       this.child.stderr.pipe(process.stdout);
       this.child.stdout.on('data', async function (data) {
          if ( self.isFinished(data) ) {
-            self.endTime = Date.now();
-            console.log("[JS] Finished!");
-            self.adjustDifficulty();
-
-            // Check pow height every 10 minutes
-            if( Date.now() - self.lastPowHeightUpdate > 1000 * 60 * 10 ) {
-               self.retrievePowHeight();
-            }
-            await self.updateLatestBlock();
-            self.writeMiningRequest(self.recentBlock);
+            await self.onRespFinished();
          }
          else if ( self.isNonce(data) ) {
-            self.endTime = Date.now();
-            var nonce = BigInt('0x' + self.getValue(data));
-            console.log( "[JS] Nonce: " + nonce );
-            var delta = self.endTime - self.lastProof;
-            self.lastProof = self.endTime;
-            var ms = delta % 1000;
-            delta = Math.trunc(delta / 1000);
-            var seconds = delta % 60;
-            delta = Math.trunc(delta / 60);
-            var minutes = delta % 60;
-            var hours = Math.trunc(delta / 60);
-            console.log( "[JS] Time to find proof: " + hours + ":" + minutes + ":" + seconds + "." + ms );
-
-            var submission = [
-               [self.address,self.oo_address],
-               [10000-self.tip,self.tip],
-               self.recentBlock.number,
-               self.recentBlock.hash,
-               '0x' + self.difficulty.toString(16),
-               self.powHeight,
-               '0x' + nonce.toString(16)
-            ];
-
-            let gasPrice = Math.round(parseInt(await self.web3.eth.getGasPrice()) * self.gasMultiplier);
-
-            if (gasPrice > self.gasPriceLimit) {
-               let error = {
-                  kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + self.gasPriceLimit + ")."
-               };
-               if (self.errorCallback && typeof self.errorCallback === "function") {
-                  self.errorCallback(error);
-               }
-            }
-
-            self.sendTransaction({
-               from: self.fromAddress,
-               to: self.contractAddress,
-               gas: (self.powHeight == 1 ? 500000 : 150000),
-               gasPrice: gasPrice,
-               data: self.contract.methods.mine(
-                  [self.address,self.oo_address],
-                  [10000-self.tip,self.tip],
-                  self.recentBlock.number,
-                  self.recentBlock.hash,
-                  '0x' + self.difficulty.toString(16),
-                  self.powHeight,
-                  '0x' + nonce.toString(16)
-               ).encodeABI()
-            });
-
-            // We will consider this a powHeight "update" to prevent immediately retrieving the old height
-            // and mining on it.
-            self.lastPowHeightUpdate = Date.now();
-            self.powHeight++;
-            self.adjustDifficulty();
-            await self.updateLatestBlock();
-            self.startTime = Date.now();
-            self.writeMiningRequest(self.recentBlock);
-
-            if (self.proofCallback && typeof self.proofCallback === "function") {
-               self.proofCallback(submission);
-            }
+            let nonce = BigInt('0x' + self.getValue(data));
+            await self.onRespNonce(nonce);
          }
          else if ( self.isHashReport(data) ) {
-            var ret = self.getValue(data).split(" ");
-            var now = Date.now();
-            var newHashes = parseInt(ret[1]);
-            self.updateHashrate(newHashes - self.hashes, now - self.endTime);
-            self.hashes = newHashes;
-            self.endTime = now;
+            let ret = self.getValue(data).split(" ");
+            let newHashes = parseInt(ret[1]);
+            await self.onRespHashReport(newHashes);
          }
          else {
             let error = {
