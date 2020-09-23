@@ -6,26 +6,85 @@ const os = require('os');
 const abi = require('./abi.js');
 const crypto = require('crypto');
 
+function sleep(ms=0)
+{
+   return new Promise(function(resolve) { setTimeout(resolve, ms); });
+}
+
+function difficultyToString( difficulty ) {
+   let difficultyStr = difficulty.toString(16);
+   difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
+   return difficultyStr;
+}
+
+function addressToBytes( addr ) {
+   // Convert a string address to bytes
+   let ADDRESS_LENGTH = 42;
+   if( addr.startsWith("0x") )
+      addr = addr.substring(2);
+   addr = "0".repeat(ADDRESS_LENGTH - addr.length) + addr;
+   return Buffer.from(addr, "hex");
+}
+
+/**
+ * A simple queue class for request/response processing.
+ *
+ * Keep track of the information that was used in a request, so we can use it in response processing.
+ */
+class MiningRequestQueue {
+   constructor( reqStream ) {
+      this.pendingRequests = [];
+      this.reqStream = reqStream;
+   }
+
+   sendRequest(req) {
+      let difficultyStr = difficultyToString( req.difficulty );
+      console.log( "[JS] Ethereum Block Number: " + req.block.number );
+      console.log( "[JS] Ethereum Block Hash:   " + req.block.hash );
+      console.log( "[JS] Target Difficulty:     " + difficultyStr );
+      this.reqStream.write(
+         req.minerAddress + " " +
+         req.tipAddress + " " +
+         req.block.hash + " " +
+         req.block.number.toString() + " " +
+         difficultyStr + " " +
+         req.tipAmount + " " +
+         req.powHeight + " " +
+         req.threadIterations + " " +
+         req.hashLimit + " " +
+         req.nonceOffset + ";\n");
+      this.pendingRequests.push(req);
+   }
+
+   getHead() {
+      if( this.pendingRequests.length === 0 )
+         return null;
+      return this.pendingRequests[0];
+   }
+
+   popHead() {
+      if( this.pendingRequests.length === 0 )
+         return null;
+      return this.pendingRequests.shift();
+   }
+}
+
 module.exports = class KoinosMiner {
-   powHeight = 0;
    threadIterations = 600000;
    hashLimit = 100000000;
    // Start at 32 bits of difficulty
    difficulty = BigInt("0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
-   startTime = Date.now();
-   endTime = Date.now();
    lastProof = Date.now();
-   lastPowHeightUpdate = Date.now();
    hashes = 0;
    hashRate = 0;
    child = null;
    contract = null;
 
-   constructor(address, oo_address, fromAddress, contractAddress, endpoint, tip, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback) {
+   constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback) {
       this.address = address;
-      this.oo_address = oo_address;
+      this.tipAddresses = tipAddresses;
       this.web3 = new Web3( endpoint );
-      this.tip  = Math.trunc(tip * 100);
+      this.tipAmount = Math.trunc(tipAmount * 100);
       this.proofPeriod = period;
       this.signCallback = signCallback;
       this.hashrateCallback = hashrateCallback;
@@ -35,7 +94,13 @@ module.exports = class KoinosMiner {
       this.gasPriceLimit = gasPriceLimit;
       this.contractAddress = contractAddress;
       this.proofCallback = proofCallback;
+      this.blockchainUpdateTimeMs = 60*1000;
       this.contract = new this.web3.eth.Contract( abi, this.contractAddress );
+      this.miningQueue = null;
+      this.powHeightCache = {};
+      this.currentPHKIndex = 0;
+      this.isStopped = false;
+      this.numTipAddresses = 3;
       var self = this;
 
       // We don't want the mining manager to go down and leave the
@@ -57,17 +122,16 @@ module.exports = class KoinosMiner {
       });
    }
 
-   async retrievePowHeight() {
+   async retrievePowHeight(phk) {
       try
       {
-         let self = this;
+         let [fromAddress, address, tipAddress, one_minus_ta, ta] = phk.split(",");
          let result = await this.contract.methods.get_pow_height(
-            this.fromAddress,
-            [this.address, this.oo_address],
-            [10000 - this.tip, this.tip]
+            fromAddress,
+            [address, tipAddress],
+            [parseInt(one_minus_ta), parseInt(ta)]
          ).call();
-         self.powHeight = parseInt(result) + 1;
-         self.lastPowHeightUpdate = Date.now();
+         this.powHeightCache[phk] = parseInt(result);
       }
       catch(e)
       {
@@ -75,8 +139,8 @@ module.exports = class KoinosMiner {
             kMessage: "Could not retrieve the PoW height.",
             exception: e
          };
-         if (self.errorCallback && typeof self.errorCallback === "function") {
-            self.errorCallback(error);
+         if (this.errorCallback && typeof this.errorCallback === "function") {
+            this.errorCallback(error);
          }
       }
    }
@@ -86,27 +150,106 @@ module.exports = class KoinosMiner {
       self.signCallback(self.web3, txData).then( (rawTx) => {
          self.web3.eth.sendSignedTransaction(rawTx).catch( async (error) => {
             console.log('[JS] Error sending transaction:', error.message);
-            // If anything goes wrong, get a new powHeight
-            await self.retrievePowHeight();
          });
       });
    }
 
-   async onRespFinished() {
-      this.endTime = Date.now();
-      console.log("[JS] Finished!");
-      this.adjustDifficulty();
-
-      // Check pow height every 10 minutes
-      if( Date.now() - this.lastPowHeightUpdate > 1000 * 60 * 10 ) {
-         this.retrievePowHeight();
-      }
-      await this.updateLatestBlock();
-      this.writeMiningRequest(this.recentBlock);
+   getPHK( tipAddress ) {
+      // Get the pow height key for the given tip address
+      let ta = this.tipAmount.toString();
+      let one_minus_ta = (10000 - this.tipAmount).toString();
+      return [this.fromAddress, this.address, tipAddress, one_minus_ta, ta].join(",");
    }
 
-   async onRespNonce(nonce) {
-      this.endTime = Date.now();
+   getActivePHKs() {
+      // Get the currently active PHK's
+      let minerTipAddresses = this.getTipAddressesForMiner( this.address );
+      let result = [];
+      for( let i=0; i<minerTipAddresses.length; i++ )
+         result.push( this.getPHK( minerTipAddresses[i] ) );
+      return result;
+   }
+
+   getCurrentPHK() {
+      let phks = this.getActivePHKs();
+      return phks[this.currentPHKIndex % phks.length];
+   }
+
+   rotateTipAddress() {
+      let phks = this.getActivePHKs();
+      this.currentPHKIndex = (this.currentPHKIndex + 1) % phks.length;
+   }
+
+   getTipAddressesForMiner( minerAddress ) {
+      // Each miner should only mine to a small subset of tip addresses
+      // Figure out which tip addresses the miner mines to as the addresses that minimize H(minerAddress + tipAddress)
+      let shuffled = [];
+      for( let i=0; i<this.tipAddresses.length; i++ ) {
+         let tipAddress = this.tipAddresses[i];
+         let sortKey = this.web3.utils.soliditySha3( minerAddress, tipAddress );
+         shuffled.push([sortKey, i]);
+      }
+      shuffled.sort( function(a, b) {
+         if( a[0] < b[0] )
+            return -1;
+         if( a[0] > b[0] )
+            return 1;
+         if( a[1] < b[1] )
+            return -1;
+         if( a[1] > b[1] )
+            return 1;
+         return 0;
+      } );
+
+      let result = [];
+      for( let i=0; i<this.numTipAddresses; i++ )
+      {
+         result.push( this.tipAddresses[shuffled[i][1]] );
+      }
+      return result;
+   }
+
+   async updateBlockchain() {
+      let phks = this.getActivePHKs();
+      for( let i=0; i<phks.length; i++ )
+      {
+         await this.retrievePowHeight(phks[i]);
+      }
+      await this.updateLatestBlock();
+   }
+
+   async updateBlockchainLoop() {
+      while(!this.isStopped)
+      {
+         await sleep( (0.75 + 0.5*Math.random()) * this.blockchainUpdateTimeMs );
+         if( this.isStopped )
+            break;
+         try
+         {
+            await this.updateBlockchain();
+         }
+         catch( e )
+         {
+            let error = {
+               kMessage: "Could not update the blockchain.",
+               exception: e
+            };
+            console.log( "[JS] Exception in updateBlockchainLoop():", e);
+            if (this.errorCallback && typeof this.errorCallback === "function") {
+               this.errorCallback(error);
+            }
+         }
+      }
+      console.log( "[JS] updateBlockchainLoop() exited" );
+   }
+
+   async onRespFinished(req) {
+      console.log("[JS] Finished!");
+      this.adjustDifficulty();
+      this.sendMiningRequest();
+   }
+
+   async onRespNonce(req, nonce) {
       console.log( "[JS] Nonce: " + nonce );
       var delta = this.endTime - this.lastProof;
       this.lastProof = this.endTime;
@@ -118,14 +261,14 @@ module.exports = class KoinosMiner {
       var hours = Math.trunc(delta / 60);
       console.log( "[JS] Time to find proof: " + hours + ":" + minutes + ":" + seconds + "." + ms );
 
-      var submission = [
-         [this.address,this.oo_address],
-         [10000-this.tip,this.tip],
-         this.recentBlock.number,
-         this.recentBlock.hash,
-         '0x' + this.difficulty.toString(16),
-         this.powHeight,
-         '0x' + nonce.toString(16)
+      let mineArgs = [
+         [req.minerAddress,req.tipAddress],
+         [10000-req.tipAmount,req.tipAmount],
+         req.block.number,
+         req.block.hash,
+         difficultyToString( req.difficulty ),
+         req.powHeight,
+         "0x" + nonce.toString(16)
       ];
 
       let gasPrice = Math.round(parseInt(await this.web3.eth.getGasPrice()) * this.gasMultiplier);
@@ -140,36 +283,23 @@ module.exports = class KoinosMiner {
       }
 
       this.sendTransaction({
-         from: this.fromAddress,
+         from: req.fromAddress,
          to: this.contractAddress,
-         gas: (this.powHeight == 1 ? 500000 : 150000),
+         gas: (req.powHeight == 1 ? 500000 : 150000),
          gasPrice: gasPrice,
-         data: this.contract.methods.mine(
-            [this.address,this.oo_address],
-            [10000-this.tip,this.tip],
-            this.recentBlock.number,
-            this.recentBlock.hash,
-            '0x' + this.difficulty.toString(16),
-            this.powHeight,
-            '0x' + nonce.toString(16)
-         ).encodeABI()
+         data: this.contract.methods.mine(...mineArgs).encodeABI()
       });
 
-      // We will consider this a powHeight "update" to prevent immediately retrieving the old height
-      // and mining on it.
-      this.lastPowHeightUpdate = Date.now();
-      this.powHeight++;
+      this.rotateTipAddress();
       this.adjustDifficulty();
-      await this.updateLatestBlock();
-      this.startTime = Date.now();
-      this.writeMiningRequest(this.recentBlock);
+      this.sendMiningRequest();
 
       if (this.proofCallback && typeof this.proofCallback === "function") {
-         this.proofCallback(submission);
+         this.proofCallback(mineArgs);
       }
    }
 
-   async onRespHashReport( newHashes )
+   async onRespHashReport( req, newHashes )
    {
       let now = Date.now();
       this.updateHashrate(newHashes - this.hashes, now - this.endTime);
@@ -186,24 +316,26 @@ module.exports = class KoinosMiner {
       console.log("[JS] Starting miner");
       var self = this;
 
-      await this.retrievePowHeight();
+      let tipAddresses = this.getTipAddressesForMiner( this.address );
+      console.log("[JS] Selected tip addresses", tipAddresses );
 
       var spawn = require('child_process').spawn;
       this.child = spawn( this.minerPath(), [this.address, this.oo_address] );
       this.child.stdin.setEncoding('utf-8');
       this.child.stderr.pipe(process.stdout);
+      this.miningQueue = new MiningRequestQueue(this.child.stdin);
       this.child.stdout.on('data', async function (data) {
-         if ( self.isFinished(data) ) {
-            await self.onRespFinished();
+         if ( self.isFinishedWithoutNonce(data) ) {
+            await self.onRespFinished(self.miningQueue.popHead());
          }
-         else if ( self.isNonce(data) ) {
+         else if ( self.isFinishedWithNonce(data) ) {
             let nonce = BigInt('0x' + self.getValue(data));
-            await self.onRespNonce(nonce);
+            await self.onRespNonce(self.miningQueue.popHead(), nonce);
          }
          else if ( self.isHashReport(data) ) {
             let ret = self.getValue(data).split(" ");
             let newHashes = parseInt(ret[1]);
-            await self.onRespHashReport(newHashes);
+            await self.onRespHashReport(self.miningQueue.getHead(), newHashes);
          }
          else {
             let error = {
@@ -215,12 +347,13 @@ module.exports = class KoinosMiner {
          }
       });
 
-      await self.updateLatestBlock();
-      self.startTime = Date.now();
-      self.writeMiningRequest(self.recentBlock);
+      await self.updateBlockchain();
+      self.updateBlockchainLoop();              // async fire-and-forget
+      self.sendMiningRequest();
    }
 
    stop() {
+      this.isStopped = true;
       if ( this.child !== null) {
          console.log("[JS] Stopping miner");
          this.child.kill('SIGINT');
@@ -244,12 +377,12 @@ module.exports = class KoinosMiner {
       return str.substring(2, str.indexOf(";"));
    }
 
-   isFinished(s) {
+   isFinishedWithoutNonce(s) {
       let str = s.toString();
       return "F:" === str.substring(0, 2);
    }
 
-   isNonce(s) {
+   isFinishedWithNonce(s) {
       let str = s.toString();
       return "N:" === str.substring(0, 2);
    }
@@ -334,23 +467,21 @@ module.exports = class KoinosMiner {
       }
    }
 
-   writeMiningRequest(block) {
-      var difficultyStr = this.difficulty.toString(16);
-      difficultyStr = "0x" + "0".repeat(64 - difficultyStr.length) + difficultyStr;
-      console.log( "[JS] Ethereum Block Number: " + block.number );
-      console.log( "[JS] Ethereum Block Hash:   " + block.hash );
-      console.log( "[JS] Target Difficulty:     " + difficultyStr );
-      this.hashes = 0;
-      this.block = block;
-      this.child.stdin.write(
-         block.hash + " " +
-         block.number.toString() + " " +
-         difficultyStr + " " +
-         this.tip + " " +
-         this.powHeight + " " +
-         Math.trunc(this.threadIterations) + " " +
-         Math.trunc(this.hashLimit) + " " +
-         this.getNonceOffset() + ";\n");
+   sendMiningRequest() {
+      let phk = this.getCurrentPHK();
+      let [fromAddress, address, tipAddress, one_minus_ta, ta] = phk.split(",");
+      this.miningQueue.sendRequest({
+         fromAddress : fromAddress,
+         minerAddress : address,
+         tipAddress : tipAddress,
+         difficulty : this.difficulty,
+         block : this.recentBlock,
+         tipAmount : ta,
+         powHeight : this.powHeightCache[phk]+1,
+         threadIterations : Math.trunc(this.threadIterations),
+         hashLimit : Math.trunc(this.hashLimit),
+         nonceOffset : this.getNonceOffset()
+         });
    }
 
    async updateLatestBlock() {

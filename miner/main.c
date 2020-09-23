@@ -20,10 +20,11 @@
 #define WORD_BUFFER_BYTES  (2 << 20) // 2 MB
 #define WORD_BUFFER_LENGTH (WORD_BUFFER_BYTES / sizeof(struct bn))
 
-#define SAMPLE_INDICES 10
-#define READ_BUFSIZE   1024
-#define ETH_HASH_SIZE  66
-#define PERCENT_100    10000
+#define SAMPLE_INDICES         10
+#define READ_BUFSIZE         1024
+#define ETH_HASH_SIZE          66
+#define ETH_ADDRESS_SIZE       42
+#define PERCENT_100         10000
 
 #define THREAD_ITERATIONS 600000
 
@@ -131,6 +132,8 @@ struct secured_struct
 
 struct input_data
 {
+   char     miner_address[ETH_ADDRESS_SIZE + 1];
+   char     tip_address[ETH_ADDRESS_SIZE + 1];
    char     block_hash[ETH_HASH_SIZE + 1];
    uint64_t block_num;
    char     difficulty_str[ETH_HASH_SIZE + 1];
@@ -163,7 +166,9 @@ void read_data( struct input_data* d )
    } while ( strlen(buf) == 0 || buf[strlen(buf)-1] != ';' );
 
    fprintf(stderr, "[C] Buffer: %s\n", buf);
-   sscanf(buf, "%66s %" SCNu64 " %66s %" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64 " %66s",
+   sscanf(buf, "%42s %42s %66s %" SCNu64 " %66s %" SCNu64 " %" SCNu64 " %" SCNu64 " %" SCNu64 " %66s",
+      d->miner_address,
+      d->tip_address,
       d->block_hash,
       &d->block_num,
       d->difficulty_str,
@@ -173,6 +178,8 @@ void read_data( struct input_data* d )
       &d->hash_limit,
       d->nonce_offset);
 
+   fprintf(stderr, "[C] Miner address: %s\n", d->miner_address);
+   fprintf(stderr, "[C] Tip address:   %s\n", d->tip_address);
    fprintf(stderr, "[C] Ethereum Block Hash: %s\n", d->block_hash );
    fprintf(stderr, "[C] Ethereum Block Number: %" PRIu64 "\n", d->block_num );
    fprintf(stderr, "[C] Difficulty Target: %s\n", d->difficulty_str );
@@ -343,46 +350,45 @@ int main( int argc, char** argv )
 
    bignum_init( &seed );
 
-   if( is_hex_prefixed( argv[1] ) )
-   {
-      bignum_from_string( &ss.miner_address, argv[1] + 2, strlen(argv[1]) - 2 );
-   }
-   else
-   {
-      bignum_from_string( &ss.miner_address, argv[1] , strlen(argv[1]) );
-   }
-
-   if( is_hex_prefixed( argv[2] ) )
-   {
-      bignum_from_string( &ss.oo_address, argv[2] + 2, strlen(argv[2]) - 2 );
-   }
-   else
-   {
-      bignum_from_string( &ss.oo_address, argv[2], strlen(argv[2]) );
-   }
-
-   bignum_to_string( &ss.miner_address, bn_str, sizeof(bn_str), false );
-   fprintf(stderr, "[C] Miner Address: %s\n", bn_str);
-
-   bignum_to_string( &ss.oo_address, bn_str, sizeof(bn_str), false );
-   fprintf(stderr, "[C] OpenOrchard Address: %s\n", bn_str);
-   fflush(stderr);
-
-   bignum_endian_swap( &ss.miner_address );
-   bignum_endian_swap( &ss.oo_address );
-
    while ( true )
    {
       struct input_data input;
 
       read_data( &input );
 
+      if( is_hex_prefixed( input.miner_address ) )
+      {
+         bignum_from_string( &ss.miner_address, input.miner_address + 2, strlen(input.miner_address) - 2 );
+      }
+      else
+      {
+         bignum_from_string( &ss.miner_address, input.miner_address , strlen(input.miner_address) );
+      }
+
+      if( is_hex_prefixed( input.tip_address ) )
+      {
+         bignum_from_string( &ss.oo_address, input.tip_address + 2, strlen(input.tip_address) - 2 );
+      }
+      else
+      {
+         bignum_from_string( &ss.oo_address, input.tip_address, strlen(input.tip_address) );
+      }
+
+      bignum_to_string( &ss.miner_address, bn_str, sizeof(bn_str), false );
+      fprintf(stderr, "[C] Miner Address: %s\n", bn_str);
+
+      bignum_to_string( &ss.oo_address, bn_str, sizeof(bn_str), false );
+      fprintf(stderr, "[C] OpenOrchard Address: %s\n", bn_str);
+      fflush(stderr);
+
+      bignum_endian_swap( &ss.miner_address );
+      bignum_endian_swap( &ss.oo_address );
+
       uint64_t miner_pay = PERCENT_100 - input.tip;
       uint64_t oo_pay    = input.tip;
 
       fprintf(stderr, "[C] Miner pay: %" PRIu64 "\n", miner_pay);
       fprintf(stderr, "[C] OpenOrchard tip: %" PRIu64 "\n", oo_pay);
-      fflush(stderr);
 
       bignum_from_int( &ss.miner_percent, PERCENT_100 - input.tip );
       bignum_endian_swap( &ss.miner_percent );
