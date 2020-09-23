@@ -285,7 +285,7 @@ module.exports = class KoinosMiner {
       this.sendTransaction({
          from: req.fromAddress,
          to: this.contractAddress,
-         gas: (req.powHeight == 1 ? 500000 : 150000),
+         gas: (req.powHeight == 1 ? 900000 : 500000),
          gasPrice: gasPrice,
          data: this.contract.methods.mine(...mineArgs).encodeABI()
       });
