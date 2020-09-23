@@ -74,6 +74,8 @@ module.exports = class KoinosMiner {
    hashLimit = 100000000;
    // Start at 32 bits of difficulty
    difficulty = BigInt("0x00000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF");
+   startTime = Date.now();
+   endTime = Date.now();
    lastProof = Date.now();
    hashes = 0;
    hashRate = 0;
@@ -245,12 +247,14 @@ module.exports = class KoinosMiner {
 
    async onRespFinished(req) {
       console.log("[JS] Finished!");
+      this.endTime = Date.now();
       this.adjustDifficulty();
       this.sendMiningRequest();
    }
 
    async onRespNonce(req, nonce) {
       console.log( "[JS] Nonce: " + nonce );
+      this.endTime = Date.now();
       var delta = this.endTime - this.lastProof;
       this.lastProof = this.endTime;
       var ms = delta % 1000;
@@ -292,6 +296,7 @@ module.exports = class KoinosMiner {
 
       this.rotateTipAddress();
       this.adjustDifficulty();
+      this.startTime = Date.now();
       this.sendMiningRequest();
 
       if (this.proofCallback && typeof this.proofCallback === "function") {
@@ -351,6 +356,7 @@ module.exports = class KoinosMiner {
 
       await self.updateBlockchain();
       self.updateBlockchainLoop();              // async fire-and-forget
+      self.startTime = Date.now();
       self.sendMiningRequest();
    }
 
@@ -472,6 +478,7 @@ module.exports = class KoinosMiner {
    sendMiningRequest() {
       let phk = this.getCurrentPHK();
       let [fromAddress, address, tipAddress, one_minus_ta, ta] = phk.split(",");
+      this.hashes = 0;
       this.miningQueue.sendRequest({
          fromAddress : fromAddress,
          minerAddress : address,
