@@ -319,6 +319,8 @@ module.exports = class KoinosMiner {
       let tipAddresses = this.getTipAddressesForMiner( this.address );
       console.log("[JS] Selected tip addresses", tipAddresses );
 
+      this.currentPHKIndex = Math.floor(this.numTipAddresses * Math.random());
+
       var spawn = require('child_process').spawn;
       this.child = spawn( this.minerPath(), [this.address, this.oo_address] );
       this.child.stdin.setEncoding('utf-8');
