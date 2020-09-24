@@ -150,8 +150,15 @@ module.exports = class KoinosMiner {
    sendTransaction(txData) {
       var self = this;
       self.signCallback(self.web3, txData).then( (rawTx) => {
-         self.web3.eth.sendSignedTransaction(rawTx).catch( async (error) => {
-            console.log('[JS] Error sending transaction:', error.message);
+         self.web3.eth.sendSignedTransaction(rawTx).catch( async (e) => {
+            console.log('[JS] Error sending transaction:', e.message);
+            let error = {
+               kMessage: e.message,
+               exception: e
+            };
+            if(self.errorCallback && typeof self.errorCallback === "function") {
+               self.errorCallback(error);
+            }
          });
       });
    }
@@ -503,14 +510,13 @@ module.exports = class KoinosMiner {
       }
       catch( e )
       {
-         if( this.errorCallback && typeof this.errorCallback === "function" ) {
-            self.errorCallback(e);
-         }
          let error = {
             kMessage: "An error occurred while attempting to start the miner.",
             exception: e
          };
-         throw error;
+         if(this.errorCallback && typeof this.errorCallback === "function") {
+            this.errorCallback(error);
+         }
       }
    }
 }
