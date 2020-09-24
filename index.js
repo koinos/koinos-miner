@@ -82,7 +82,7 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback) {
+   constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback, warningCallback) {
       this.address = address;
       this.tipAddresses = tipAddresses;
       this.web3 = new Web3( endpoint );
@@ -91,6 +91,7 @@ module.exports = class KoinosMiner {
       this.signCallback = signCallback;
       this.hashrateCallback = hashrateCallback;
       this.errorCallback = errorCallback;
+      this.warningCallback = warningCallback;
       this.fromAddress = fromAddress;
       this.gasMultiplier = gasMultiplier;
       this.gasPriceLimit = gasPriceLimit;
@@ -152,12 +153,12 @@ module.exports = class KoinosMiner {
       self.signCallback(self.web3, txData).then( (rawTx) => {
          self.web3.eth.sendSignedTransaction(rawTx).catch( async (e) => {
             console.log('[JS] Error sending transaction:', e.message);
-            let error = {
+            let warning = {
                kMessage: e.message,
                exception: e
             };
-            if(self.errorCallback && typeof self.errorCallback === "function") {
-               self.errorCallback(error);
+            if(self.warningCallback && typeof self.warningCallback === "function") {
+               self.warningCallback(error);
             }
          });
       });
