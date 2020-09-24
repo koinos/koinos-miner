@@ -158,7 +158,7 @@ module.exports = class KoinosMiner {
                exception: e
             };
             if(self.warningCallback && typeof self.warningCallback === "function") {
-               self.warningCallback(error);
+               self.warningCallback(warning);
             }
          });
       });
