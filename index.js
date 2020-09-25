@@ -512,7 +512,7 @@ module.exports = class KoinosMiner {
       catch( e )
       {
          let error = {
-            kMessage: "An error occurred while attempting to start the miner.",
+            kMessage: "An error occurred while attempting to retrieve the latest block.",
             exception: e
          };
          if(this.errorCallback && typeof this.errorCallback === "function") {
