@@ -82,7 +82,7 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback) {
+   constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback, warningCallback) {
       this.address = address;
       this.tipAddresses = tipAddresses;
       this.web3 = new Web3( endpoint );
@@ -91,6 +91,7 @@ module.exports = class KoinosMiner {
       this.signCallback = signCallback;
       this.hashrateCallback = hashrateCallback;
       this.errorCallback = errorCallback;
+      this.warningCallback = warningCallback;
       this.fromAddress = fromAddress;
       this.gasMultiplier = gasMultiplier;
       this.gasPriceLimit = gasPriceLimit;
@@ -150,8 +151,15 @@ module.exports = class KoinosMiner {
    sendTransaction(txData) {
       var self = this;
       self.signCallback(self.web3, txData).then( (rawTx) => {
-         self.web3.eth.sendSignedTransaction(rawTx).catch( async (error) => {
-            console.log('[JS] Error sending transaction:', error.message);
+         self.web3.eth.sendSignedTransaction(rawTx).catch( async (e) => {
+            console.log('[JS] Error sending transaction:', e.message);
+            let warning = {
+               kMessage: e.message,
+               exception: e
+            };
+            if(self.warningCallback && typeof self.warningCallback === "function") {
+               self.warningCallback(warning);
+            }
          });
       });
    }
@@ -503,14 +511,13 @@ module.exports = class KoinosMiner {
       }
       catch( e )
       {
-         if( this.errorCallback && typeof this.errorCallback === "function" ) {
-            self.errorCallback(e);
-         }
          let error = {
-            kMessage: "An error occurred while attempting to start the miner.",
+            kMessage: "An error occurred while attempting to retrieve the latest block.",
             exception: e
          };
-         throw error;
+         if(this.errorCallback && typeof this.errorCallback === "function") {
+            this.errorCallback(error);
+         }
       }
    }
 }

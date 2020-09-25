@@ -64,6 +64,10 @@ var account;
 
 var w3 = new Web3(process.endpoint);
 
+let warningCallback = function(warning) {
+   console.log(`[JS](app.js) Warning: ` + warning);
+}
+
 let errorCallback = function(error) {
    console.log(`[JS](app.js) Error: ` + error);
 }
@@ -189,6 +193,7 @@ var miner = new KoinosMiner(
    signCallback,
    hashrateCallback,
    proofCallback,
-   errorCallback);
+   errorCallback,
+   warningCallback);
 
 miner.start();
