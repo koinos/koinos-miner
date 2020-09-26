@@ -31,6 +31,10 @@ if (NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-unknown-pragmas" )
 endif()
 
+if(MINGW)
+     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive")
+endif()
+
 SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -fopenmp -static-libgcc")
 
 if(APPLE)
