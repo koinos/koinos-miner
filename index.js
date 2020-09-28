@@ -548,7 +548,7 @@ module.exports = class KoinosMiner {
       {
          this.headBlock = await this.web3.eth.getBlock("latest");
          // get several blocks behind head block so most reorgs don't invalidate mining
-         let confirmedBlock = await this.web3.eth.getBlock(headBlock.number - 6 );
+         let confirmedBlock = await this.web3.eth.getBlock(this.headBlock.number - 6 );
          this.recentBlock = confirmedBlock;
       }
       catch( e )
