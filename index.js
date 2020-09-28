@@ -5,11 +5,7 @@ var Tx = require('ethereumjs-tx').Transaction;
 const os = require('os');
 const abi = require('./abi.js');
 const crypto = require('crypto');
-
-function sleep(ms=0)
-{
-   return new Promise(function(resolve) { setTimeout(resolve, ms); });
-}
+const {Looper} = require("./looper.js");
 
 function difficultyToString( difficulty ) {
    let difficultyStr = difficulty.toString(16);
@@ -83,6 +79,8 @@ module.exports = class KoinosMiner {
    contract = null;
 
    constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback, warningCallback) {
+      let self = this;
+
       this.address = address;
       this.tipAddresses = tipAddresses;
       this.web3 = new Web3( endpoint );
@@ -97,14 +95,15 @@ module.exports = class KoinosMiner {
       this.gasPriceLimit = gasPriceLimit;
       this.contractAddress = contractAddress;
       this.proofCallback = proofCallback;
-      this.blockchainUpdateTimeMs = 60*1000;
+      this.updateBlockchainLoop = new Looper(
+         function() { return self.updateBlockchain(); },
+         60*1000,
+         function(e) { return self.updateBlockchainError(e); } );
       this.contract = new this.web3.eth.Contract( abi, this.contractAddress );
       this.miningQueue = null;
       this.powHeightCache = {};
       this.currentPHKIndex = 0;
-      this.isStopped = false;
       this.numTipAddresses = 3;
-      var self = this;
 
       // We don't want the mining manager to go down and leave the
       // C process running indefinitely, so we send SIGINT before
@@ -233,29 +232,15 @@ module.exports = class KoinosMiner {
       await this.updateLatestBlock();
    }
 
-   async updateBlockchainLoop() {
-      while(!this.isStopped)
-      {
-         await sleep( (0.75 + 0.5*Math.random()) * this.blockchainUpdateTimeMs );
-         if( this.isStopped )
-            break;
-         try
-         {
-            await this.updateBlockchain();
-         }
-         catch( e )
-         {
-            let error = {
-               kMessage: "Could not update the blockchain.",
-               exception: e
-            };
-            console.log( "[JS] Exception in updateBlockchainLoop():", e);
-            if (this.errorCallback && typeof this.errorCallback === "function") {
-               this.errorCallback(error);
-            }
-         }
+   updateBlockchainError(e) {
+      let error = {
+         kMessage: "Could not update the blockchain.",
+         exception: e
+         };
+      console.log( "[JS] Exception in updateBlockchainLoop():", e);
+      if (this.errorCallback && typeof this.errorCallback === "function") {
+         this.errorCallback(error);
       }
-      console.log( "[JS] updateBlockchainLoop() exited" );
    }
 
    async onRespFinished(req) {
@@ -363,14 +348,18 @@ module.exports = class KoinosMiner {
          }
       });
 
-      await self.updateBlockchain();
-      self.updateBlockchainLoop();              // async fire-and-forget
+      try {
+         await self.updateBlockchain();
+      }
+      catch( e ) {
+         self.updateBlockchainError(e);
+      }
+      self.updateBlockchainLoop.start();              // async fire-and-forget
       self.startTime = Date.now();
       self.sendMiningRequest();
    }
 
    stop() {
-      this.isStopped = true;
       if ( this.child !== null) {
          console.log("[JS] Stopping miner");
          this.child.kill('SIGINT');
@@ -379,6 +368,16 @@ module.exports = class KoinosMiner {
       else {
          console.log("[JS] Miner has already stopped");
       }
+
+     console.log("[JS] Stopping blockchain update loop");
+     try {
+        this.updateBlockchainLoop.stop();
+     }
+     catch( e ) {
+        if( e.name === "LooperAlreadyStopping" ) {
+           console.log("[JS] Blockchain update loop was already stopping");
+        }
+     }
    }
 
    minerPath() {
