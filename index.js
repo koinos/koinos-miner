@@ -151,16 +151,20 @@ module.exports = class KoinosMiner {
    sendTransaction(txData) {
       var self = this;
       self.signCallback(self.web3, txData).then( (rawTx) => {
-         self.web3.eth.sendSignedTransaction(rawTx).catch( async (e) => {
-            console.log('[JS] Error sending transaction:', e.message);
-            let warning = {
-               kMessage: e.message,
-               exception: e
-            };
-            if(self.warningCallback && typeof self.warningCallback === "function") {
-               self.warningCallback(warning);
-            }
-         });
+         self.web3.eth.sendSignedTransaction(rawTx)
+            .on("transactionHash", function(hash) {
+               console.log("[JS] Transaction hash is", hash);
+            })
+            .catch( async (e) => {
+               console.log('[JS] Error sending transaction:', e.message);
+               let warning = {
+                  kMessage: e.message,
+                  exception: e
+               };
+               if(self.warningCallback && typeof self.warningCallback === "function") {
+                  self.warningCallback(warning);
+               }
+            });
       });
    }
 
