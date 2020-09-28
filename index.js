@@ -22,6 +22,20 @@ function addressToBytes( addr ) {
    return Buffer.from(addr, "hex");
 }
 
+function secondsToDhms(seconds) {
+   seconds = Number(seconds);
+   let d = Math.floor(seconds / (3600*24));
+   let h = Math.floor(seconds % (3600*24) / 3600);
+   let m = Math.floor(seconds % 3600 / 60);
+   let s = Math.floor(seconds % 60);
+
+   let dDisplay = d > 0 ? d + (d == 1 ? " day" : " days") : "";
+   let hDisplay = h > 0 ? ((d) ? ", ": "") + h + (h == 1 ? " hour" : " hours") : "";
+   let mDisplay = m > 0 ? ((d|h) ? ", ": "") + m + (m == 1 ? " minute" : " minutes") : "";
+   let sDisplay = s > 0 ? ((d|h|m) ? ", ": "") + s + (s == 1 ? " second" : " seconds") : "";
+   return dDisplay + hDisplay + mDisplay + sDisplay;
+}
+
 /**
  * A simple queue class for request/response processing.
  *
@@ -104,6 +118,7 @@ module.exports = class KoinosMiner {
       this.powHeightCache = {};
       this.currentPHKIndex = 0;
       this.numTipAddresses = 3;
+      this.isMining = false;
 
       // We don't want the mining manager to go down and leave the
       // C process running indefinitely, so we send SIGINT before
@@ -225,6 +240,21 @@ module.exports = class KoinosMiner {
          await this.retrievePowHeight(phks[i]);
       }
       await this.updateLatestBlock();
+      if (!this.isMining) {
+         if (this.headBlock.timestamp > this.contractStartTime) {
+            this.isMining = true;
+            this.sendMiningRequest();
+         }
+         else {
+            let diff = this.contractStartTime - this.headBlock.timestamp;
+            let warning = {
+               kMessage: "Koinos mining will begin in " + secondsToDhms(diff)
+            };
+            if (this.warningCallback && typeof this.warningCallback === "function") {
+               this.warningCallback(warning);
+            }
+         }
+      }
    }
 
    updateBlockchainError(e) {
@@ -348,6 +378,19 @@ module.exports = class KoinosMiner {
       });
 
       try {
+         this.contractStartTime = await this.contract.methods.start_time().call();
+      }
+      catch (e) {
+         let error = {
+            kMessage: "Failed to retrieve the start time from the token mining contract.",
+            exception: e
+         };
+         if (this.errorCallback && typeof this.errorCallback === "function") {
+            this.errorCallback(error);
+         }
+      }
+
+      try {
          await self.updateBlockchain();
       }
       catch( e ) {
@@ -355,7 +398,6 @@ module.exports = class KoinosMiner {
       }
       self.updateBlockchainLoop.start();              // async fire-and-forget
       self.startTime = Date.now();
-      self.sendMiningRequest();
    }
 
    stop() {
@@ -377,6 +419,7 @@ module.exports = class KoinosMiner {
            console.log("[JS] Blockchain update loop was already stopping");
         }
      }
+     this.isMining = false;
    }
 
    minerPath() {
@@ -503,7 +546,7 @@ module.exports = class KoinosMiner {
    async updateLatestBlock() {
       try
       {
-         let headBlock = await this.web3.eth.getBlock("latest");
+         this.headBlock = await this.web3.eth.getBlock("latest");
          // get several blocks behind head block so most reorgs don't invalidate mining
          let confirmedBlock = await this.web3.eth.getBlock(headBlock.number - 6 );
          this.recentBlock = confirmedBlock;
