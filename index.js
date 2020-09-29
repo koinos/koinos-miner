@@ -6,7 +6,6 @@ const os = require('os');
 const abi = require('./abi.js');
 const crypto = require('crypto');
 const {Looper} = require("./looper.js");
-const { throws } = require('assert');
 
 function difficultyToString( difficulty ) {
    let difficultyStr = difficulty.toString(16);
