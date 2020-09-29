@@ -104,6 +104,20 @@ module.exports = class KoinosMiner {
       this.powHeightCache = {};
       this.currentPHKIndex = 0;
       this.numTipAddresses = 3;
+      this.isMining = false;
+
+      try {
+         this.contractStartTime = (async () => await this.contract.methods.start_time().call())();
+      }
+      catch (e) {
+         let error = {
+            kMessage: "Failed to retrieve the start time from the token mining contract.",
+            exception: e
+         };
+         if (this.errorCallback && typeof this.errorCallback === "function") {
+            this.errorCallback(error);
+         }
+      }
 
       // We don't want the mining manager to go down and leave the
       // C process running indefinitely, so we send SIGINT before
@@ -122,6 +136,10 @@ module.exports = class KoinosMiner {
             self.errorCallback(error);
          }
       });
+   }
+
+   getMiningStartTime() {
+      return this.contractStartTime;
    }
 
    async retrievePowHeight(phk) {
@@ -230,6 +248,12 @@ module.exports = class KoinosMiner {
          await this.retrievePowHeight(phks[i]);
       }
       await this.updateLatestBlock();
+      if (!this.isMining) {
+         if (this.headBlock.timestamp >= this.contractStartTime) {
+            this.isMining = true;
+            this.sendMiningRequest();
+         }
+      }
    }
 
    updateBlockchainError(e) {
@@ -356,7 +380,6 @@ module.exports = class KoinosMiner {
       }
       self.updateBlockchainLoop.start();              // async fire-and-forget
       self.startTime = Date.now();
-      self.sendMiningRequest();
    }
 
    stop() {
@@ -378,6 +401,7 @@ module.exports = class KoinosMiner {
            console.log("[JS] Blockchain update loop was already stopping");
         }
      }
+     this.isMining = false;
    }
 
    minerPath() {
@@ -504,9 +528,9 @@ module.exports = class KoinosMiner {
    async updateLatestBlock() {
       try
       {
-         let headBlock = await this.web3.eth.getBlock("latest");
+         this.headBlock = await this.web3.eth.getBlock("latest");
          // get several blocks behind head block so most reorgs don't invalidate mining
-         let confirmedBlock = await this.web3.eth.getBlock(headBlock.number - 6 );
+         let confirmedBlock = await this.web3.eth.getBlock(this.headBlock.number - 6 );
          this.recentBlock = confirmedBlock;
       }
       catch( e )
