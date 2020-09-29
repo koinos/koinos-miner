@@ -106,18 +106,7 @@ module.exports = class KoinosMiner {
       this.numTipAddresses = 3;
       this.isMining = false;
 
-      try {
-         this.contractStartTime = (async () => await this.contract.methods.start_time().call())();
-      }
-      catch (e) {
-         let error = {
-            kMessage: "Failed to retrieve the start time from the token mining contract.",
-            exception: e
-         };
-         if (this.errorCallback && typeof this.errorCallback === "function") {
-            this.errorCallback(error);
-         }
-      }
+      this.contractStartTimePromise = this.contract.methods.start_time().call();
 
       // We don't want the mining manager to go down and leave the
       // C process running indefinitely, so we send SIGINT before
@@ -136,6 +125,25 @@ module.exports = class KoinosMiner {
             self.errorCallback(error);
          }
       });
+   }
+
+   async awaitInitialization() {
+      if (this.contractStartTimePromise !== null) {
+         try {
+            this.contractStartTime = await this.contractStartTimePromise;
+            this.contractStartTimePromise = null;
+         }
+         catch (e) {
+            let error = {
+               kMessage: "Failed to retrieve the start time from the token mining contract.",
+               exception: e
+            };
+            if (this.errorCallback && typeof this.errorCallback === "function") {
+               this.errorCallback(error);
+               return;
+            }
+         }
+      }
    }
 
    getMiningStartTime() {
@@ -248,6 +256,8 @@ module.exports = class KoinosMiner {
          await this.retrievePowHeight(phks[i]);
       }
       await this.updateLatestBlock();
+      await this.awaitInitialization();
+
       if (!this.isMining) {
          if (this.headBlock.timestamp >= this.contractStartTime) {
             this.isMining = true;
