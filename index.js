@@ -6,6 +6,7 @@ const os = require('os');
 const abi = require('./abi.js');
 const crypto = require('crypto');
 const {Looper} = require("./looper.js");
+const { throws } = require('assert');
 
 function difficultyToString( difficulty ) {
    let difficultyStr = difficulty.toString(16);
@@ -116,7 +117,6 @@ module.exports = class KoinosMiner {
          console.log(error);
          if (this.errorCallback && typeof this.errorCallback === "function") {
             this.errorCallback(error);
-            return;
          }
       });
 
@@ -142,6 +142,7 @@ module.exports = class KoinosMiner {
    async awaitInitialization() {
       if (this.contractStartTimePromise !== null) {
          await this.contractStartTimePromise;
+         this.contractStartTimePromise = null;
       }
    }
 
