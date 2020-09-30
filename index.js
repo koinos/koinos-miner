@@ -104,7 +104,6 @@ module.exports = class KoinosMiner {
       this.powHeightCache = {};
       this.currentPHKIndex = 0;
       this.numTipAddresses = 3;
-      this.isMining = false;
 
       this.contractStartTimePromise = this.contract.methods.start_time().call().then( (startTime) => {
          this.contractStartTime = startTime;
@@ -255,14 +254,6 @@ module.exports = class KoinosMiner {
          await this.retrievePowHeight(phks[i]);
       }
       await this.updateLatestBlock();
-      await this.awaitInitialization();
-
-      if (!this.isMining) {
-         if (this.headBlock.timestamp >= this.contractStartTime) {
-            this.isMining = true;
-            this.sendMiningRequest();
-         }
-      }
    }
 
    updateBlockchainError(e) {
@@ -339,13 +330,11 @@ module.exports = class KoinosMiner {
       this.endTime = now;
    }
 
-   async start() {
-      if (this.child !== null) {
-         console.log("[JS] Miner has already started");
-         return;
+   async runMiner() {
+      if (this.startTimeout) {
+         clearTimeout(this.startTimeout);
+         this.startTimeout = null;
       }
-
-      console.log("[JS] Starting miner");
       var self = this;
 
       let tipAddresses = this.getTipAddressesForMiner( this.address );
@@ -380,6 +369,18 @@ module.exports = class KoinosMiner {
             }
          }
       });
+      self.updateBlockchainLoop.start();
+      self.sendMiningRequest();
+   }
+
+   async start() {
+      if (this.child !== null) {
+         console.log("[JS] Miner has already started");
+         return;
+      }
+
+      console.log("[JS] Starting miner");
+      var self = this;
 
       try {
          await self.updateBlockchain();
@@ -387,8 +388,24 @@ module.exports = class KoinosMiner {
       catch( e ) {
          self.updateBlockchainError(e);
       }
-      self.updateBlockchainLoop.start();              // async fire-and-forget
+      await this.awaitInitialization();
+
       self.startTime = Date.now();
+      let now = Math.floor(Date.now() / 1000);
+      if (now < this.contractStartTime) {
+         let startDateTime = new Date(this.contractStartTime * 1000);
+         console.log("[JS] Mining will begin at " + startDateTime.toLocaleString());
+         if (this.startTimeout) {
+            clearTimeout(this.startTimeout);
+            this.startTimeout = null;
+         }
+         this.startTimeout = setTimeout(function() {
+            self.runMiner();
+         }, (this.contractStartTime - now) * 1000);
+      }
+      else {
+         this.runMiner();
+      }
    }
 
    stop() {
@@ -410,7 +427,6 @@ module.exports = class KoinosMiner {
            console.log("[JS] Blockchain update loop was already stopping");
         }
      }
-     this.isMining = false;
    }
 
    minerPath() {
