@@ -68,7 +68,7 @@ class Looper {
       }
       else {
          // Running, so join() will add to _joinWaiters
-         _joinWaiters.push(resolve);
+         this._joinWaiters.push(resolve);
       }
       return prom;
    }
