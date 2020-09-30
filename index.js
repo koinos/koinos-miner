@@ -104,6 +104,7 @@ module.exports = class KoinosMiner {
       this.powHeightCache = {};
       this.currentPHKIndex = 0;
       this.numTipAddresses = 3;
+      this.startTimeout = null;
 
       this.contractStartTimePromise = this.contract.methods.start_time().call().then( (startTime) => {
          this.contractStartTime = startTime;
@@ -374,6 +375,11 @@ module.exports = class KoinosMiner {
    }
 
    async start() {
+      if (this.startTimeout !== null) {
+         console.log("[JS] Miner is already scheduled to start");
+         return;
+      }
+
       if (this.child !== null) {
          console.log("[JS] Miner has already started");
          return;
@@ -395,10 +401,6 @@ module.exports = class KoinosMiner {
       if (now < this.contractStartTime) {
          let startDateTime = new Date(this.contractStartTime * 1000);
          console.log("[JS] Mining will begin at " + startDateTime.toLocaleString());
-         if (this.startTimeout) {
-            clearTimeout(this.startTimeout);
-            this.startTimeout = null;
-         }
          this.startTimeout = setTimeout(function() {
             self.runMiner();
          }, (this.contractStartTime - now) * 1000);
@@ -409,7 +411,7 @@ module.exports = class KoinosMiner {
    }
 
    stop() {
-      if ( this.child !== null) {
+      if (this.child !== null) {
          console.log("[JS] Stopping miner");
          this.child.kill('SIGINT');
          this.child = null;
@@ -418,15 +420,20 @@ module.exports = class KoinosMiner {
          console.log("[JS] Miner has already stopped");
       }
 
-     console.log("[JS] Stopping blockchain update loop");
-     try {
-        this.updateBlockchainLoop.stop();
-     }
-     catch( e ) {
-        if( e.name === "LooperAlreadyStopping" ) {
-           console.log("[JS] Blockchain update loop was already stopping");
-        }
-     }
+      if (this.startTimeout !== null) {
+         clearTimeout(this.startTimeout);
+         this.startTimeout = null;
+      }
+
+      console.log("[JS] Stopping blockchain update loop");
+      try {
+         this.updateBlockchainLoop.stop();
+      }
+      catch( e ) {
+         if( e.name === "LooperAlreadyStopping" ) {
+            console.log("[JS] Blockchain update loop was already stopping");
+         }
+      }
    }
 
    minerPath() {
