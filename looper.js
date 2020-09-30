@@ -89,6 +89,15 @@ class Looper {
       return this.join();
    }
 
+   try_stop() {
+      if( this._interruptResolve !== null ) {
+         setTimeout( this._interruptResolve, 0 );
+         this._interruptResolve = null;
+      }
+
+      return this.join();
+   }
+
    /**
     * Start the loop.  Fire-and-forget.
     *
