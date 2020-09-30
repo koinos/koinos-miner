@@ -331,6 +331,10 @@ module.exports = class KoinosMiner {
    }
 
    async runMiner() {
+      if (this.startTimeout) {
+         clearTimeout(this.startTimeout);
+         this.startTimeout = null;
+      }
       var self = this;
 
       let tipAddresses = this.getTipAddressesForMiner( this.address );
@@ -391,7 +395,11 @@ module.exports = class KoinosMiner {
       if (now < this.contractStartTime) {
          let startDateTime = new Date(this.contractStartTime * 1000);
          console.log("[JS] Mining will begin at " + startDateTime.toLocaleString());
-         setTimeout(function() {
+         if (this.startTimeout) {
+            clearTimeout(this.startTimeout);
+            this.startTimeout = null;
+         }
+         this.startTimeout = setTimeout(function() {
             self.runMiner();
          }, (this.contractStartTime - now) * 1000);
       }
