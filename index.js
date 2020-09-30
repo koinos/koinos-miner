@@ -387,12 +387,13 @@ module.exports = class KoinosMiner {
       await this.awaitInitialization();
 
       self.startTime = Date.now();
-      if (this.headBlock.timestamp < this.contractStartTime) {
+      let now = Math.floor(Date.now() / 1000);
+      if (now < this.contractStartTime) {
          let startDateTime = new Date(this.contractStartTime * 1000);
          console.log("[JS] Mining will begin at " + startDateTime.toLocaleString());
          setTimeout(function() {
             self.runMiner();
-         }, (this.contractStartTime - this.headBlock.timestamp) * 1000);
+         }, (this.contractStartTime - now) * 1000);
       }
       else {
          this.runMiner();
