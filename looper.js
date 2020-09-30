@@ -68,7 +68,7 @@ class Looper {
       }
       else {
          // Running, so join() will add to _joinWaiters
-         _joinWaiters.push(resolve);
+         this._joinWaiters.push(resolve);
       }
       return prom;
    }
@@ -86,6 +86,15 @@ class Looper {
       // Call _interruptResolve() to fire the promise.
       setTimeout( this._interruptResolve, 0 );
       this._interruptResolve = null;
+      return this.join();
+   }
+
+   try_stop() {
+      if( this._interruptResolve !== null ) {
+         setTimeout( this._interruptResolve, 0 );
+         this._interruptResolve = null;
+      }
+
       return this.join();
    }
 
