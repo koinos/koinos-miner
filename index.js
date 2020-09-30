@@ -330,13 +330,7 @@ module.exports = class KoinosMiner {
       this.endTime = now;
    }
 
-   async start() {
-      if (this.child !== null) {
-         console.log("[JS] Miner has already started");
-         return;
-      }
-
-      console.log("[JS] Starting miner");
+   async runMiner() {
       var self = this;
 
       let tipAddresses = this.getTipAddressesForMiner( this.address );
@@ -371,6 +365,18 @@ module.exports = class KoinosMiner {
             }
          }
       });
+      self.updateBlockchainLoop.start();
+      self.sendMiningRequest();
+   }
+
+   async start() {
+      if (this.child !== null) {
+         console.log("[JS] Miner has already started");
+         return;
+      }
+
+      console.log("[JS] Starting miner");
+      var self = this;
 
       try {
          await self.updateBlockchain();
@@ -385,13 +391,11 @@ module.exports = class KoinosMiner {
          let startDateTime = new Date(this.contractStartTime * 1000);
          console.log("[JS] Mining will begin at " + startDateTime.toLocaleString());
          setTimeout(function() {
-            self.updateBlockchainLoop.start();
-            sendMiningRequest();
-         }, this.contractStartTime - this.headBlock.timestamp);
+            self.runMiner();
+         }, (this.contractStartTime - this.headBlock.timestamp) * 1000);
       }
       else {
-         self.updateBlockchainLoop.start();
-         sendMiningRequest();
+         this.runMiner();
       }
    }
 
