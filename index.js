@@ -176,6 +176,7 @@ module.exports = class KoinosMiner {
       var self = this;
       self.signCallback(self.web3, txData).then( (rawTx) => {
          self.web3.eth.sendSignedTransaction(rawTx).then( (receipt) => {
+            console.log("[JS] Transaction hash is", receipt.transactionHash);
             if (self.proofCallback && typeof self.proofCallback === "function") {
                self.proofCallback(receipt, txData.gasPrice);
             }
