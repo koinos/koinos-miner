@@ -58,7 +58,7 @@ const tip_addresses = [
    "0x7816F8c83aAed6dF618960B3954c62179C85549D",
    "0xB32613375c6Fc0be07433B751B75cd5B9FF04Db3"
    ];
-const contract_address = '0xD5dD4afc0f9611FBC86f710943a503c374567d00';
+const contract_address = '0x480B9989f62Ac453620aCf573A7bca86Ae19E9f7';
 
 var account;
 
