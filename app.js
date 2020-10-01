@@ -6,7 +6,7 @@ program
    .version('1.0.0', '-v, --version')
    .usage('[OPTIONS]...')
    .requiredOption('-a, --addr <addr>', 'An ethereum address')
-   .option('-e, --endpoint <endpoint>', 'An ethereum endpoint', 'https://ropsten.rpc.fiews.io/v1/free')
+   .option('-e, --endpoint <endpoint>', 'An ethereum endpoint', 'wss://ropsten-rpc.linkpool.io/ws')
    .option('-t, --tip <percent>', 'The percentage of mined coins to tip the developers', '5')
    .option('-p, --proof-period <seconds>', 'How often you want to submit a proof on average', '86400')
    .option('-k, --key-file <file>', 'AES encrypted file containing private key')
@@ -62,7 +62,7 @@ const contract_address = '0xD5dD4afc0f9611FBC86f710943a503c374567d00';
 
 var account;
 
-var w3 = new Web3(process.endpoint);
+var w3 = new Web3(program.endpoint);
 
 let warningCallback = function(warning) {
    console.log(`[JS](app.js) Warning: ` + warning);

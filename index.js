@@ -5,11 +5,7 @@ var Tx = require('ethereumjs-tx').Transaction;
 const os = require('os');
 const abi = require('./abi.js');
 const crypto = require('crypto');
-
-function sleep(ms=0)
-{
-   return new Promise(function(resolve) { setTimeout(resolve, ms); });
-}
+const {Looper} = require("./looper.js");
 
 function difficultyToString( difficulty ) {
    let difficultyStr = difficulty.toString(16);
@@ -83,6 +79,8 @@ module.exports = class KoinosMiner {
    contract = null;
 
    constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback, warningCallback) {
+      let self = this;
+
       this.address = address;
       this.tipAddresses = tipAddresses;
       this.web3 = new Web3( endpoint );
@@ -97,14 +95,29 @@ module.exports = class KoinosMiner {
       this.gasPriceLimit = gasPriceLimit;
       this.contractAddress = contractAddress;
       this.proofCallback = proofCallback;
-      this.blockchainUpdateTimeMs = 60*1000;
+      this.updateBlockchainLoop = new Looper(
+         function() { return self.updateBlockchain(); },
+         60*1000,
+         function(e) { return self.updateBlockchainError(e); } );
       this.contract = new this.web3.eth.Contract( abi, this.contractAddress );
       this.miningQueue = null;
       this.powHeightCache = {};
       this.currentPHKIndex = 0;
-      this.isStopped = false;
       this.numTipAddresses = 3;
-      var self = this;
+      this.startTimeout = null;
+
+      this.contractStartTimePromise = this.contract.methods.start_time().call().then( (startTime) => {
+         this.contractStartTime = startTime;
+      }).catch( (e) => {
+         let error = {
+            kMessage: "Failed to retrieve the start time from the token mining contract.",
+            exception: e
+         };
+         console.log(error);
+         if (this.errorCallback && typeof this.errorCallback === "function") {
+            this.errorCallback(error);
+         }
+      });
 
       // We don't want the mining manager to go down and leave the
       // C process running indefinitely, so we send SIGINT before
@@ -123,6 +136,17 @@ module.exports = class KoinosMiner {
             self.errorCallback(error);
          }
       });
+   }
+
+   async awaitInitialization() {
+      if (this.contractStartTimePromise !== null) {
+         await this.contractStartTimePromise;
+         this.contractStartTimePromise = null;
+      }
+   }
+
+   getMiningStartTime() {
+      return this.contractStartTime;
    }
 
    async retrievePowHeight(phk) {
@@ -151,20 +175,22 @@ module.exports = class KoinosMiner {
    sendTransaction(txData) {
       var self = this;
       self.signCallback(self.web3, txData).then( (rawTx) => {
-         self.web3.eth.sendSignedTransaction(rawTx)
-            .on("transactionHash", function(hash) {
-               console.log("[JS] Transaction hash is", hash);
-            })
-            .catch( async (e) => {
-               console.log('[JS] Error sending transaction:', e.message);
-               let warning = {
-                  kMessage: e.message,
-                  exception: e
-               };
-               if(self.warningCallback && typeof self.warningCallback === "function") {
-                  self.warningCallback(warning);
-               }
-            });
+         self.web3.eth.sendSignedTransaction(rawTx).then( (receipt) => {
+            console.log("[JS] Transaction hash is", receipt.transactionHash);
+            if (self.proofCallback && typeof self.proofCallback === "function") {
+               self.proofCallback(receipt, txData.gasPrice);
+            }
+         }).
+         catch( async (e) => {
+            console.log('[JS] Error sending transaction:', e.message);
+            let warning = {
+               kMessage: e.message,
+               exception: e
+            };
+            if(self.warningCallback && typeof self.warningCallback === "function") {
+               self.warningCallback(warning);
+            }
+         });
       });
    }
 
@@ -232,29 +258,15 @@ module.exports = class KoinosMiner {
       await this.updateLatestBlock();
    }
 
-   async updateBlockchainLoop() {
-      while(!this.isStopped)
-      {
-         await sleep( (0.75 + 0.5*Math.random()) * this.blockchainUpdateTimeMs );
-         if( this.isStopped )
-            break;
-         try
-         {
-            await this.updateBlockchain();
-         }
-         catch( e )
-         {
-            let error = {
-               kMessage: "Could not update the blockchain.",
-               exception: e
-            };
-            console.log( "[JS] Exception in updateBlockchainLoop():", e);
-            if (this.errorCallback && typeof this.errorCallback === "function") {
-               this.errorCallback(error);
-            }
-         }
+   updateBlockchainError(e) {
+      let error = {
+         kMessage: "Could not update the blockchain.",
+         exception: e
+         };
+      console.log( "[JS] Exception in updateBlockchainLoop():", e);
+      if (this.errorCallback && typeof this.errorCallback === "function") {
+         this.errorCallback(error);
       }
-      console.log( "[JS] updateBlockchainLoop() exited" );
    }
 
    async onRespFinished(req) {
@@ -310,10 +322,6 @@ module.exports = class KoinosMiner {
       this.adjustDifficulty();
       this.startTime = Date.now();
       this.sendMiningRequest();
-
-      if (this.proofCallback && typeof this.proofCallback === "function") {
-         this.proofCallback(mineArgs);
-      }
    }
 
    async onRespHashReport( req, newHashes )
@@ -324,13 +332,11 @@ module.exports = class KoinosMiner {
       this.endTime = now;
    }
 
-   async start() {
-      if (this.child !== null) {
-         console.log("[JS] Miner has already started");
-         return;
+   async runMiner() {
+      if (this.startTimeout) {
+         clearTimeout(this.startTimeout);
+         this.startTimeout = null;
       }
-
-      console.log("[JS] Starting miner");
       var self = this;
 
       let tipAddresses = this.getTipAddressesForMiner( this.address );
@@ -365,22 +371,69 @@ module.exports = class KoinosMiner {
             }
          }
       });
-
-      await self.updateBlockchain();
-      self.updateBlockchainLoop();              // async fire-and-forget
-      self.startTime = Date.now();
+      self.updateBlockchainLoop.start();
       self.sendMiningRequest();
    }
 
+   async start() {
+      if (this.startTimeout !== null) {
+         console.log("[JS] Miner is already scheduled to start");
+         return;
+      }
+
+      if (this.child !== null) {
+         console.log("[JS] Miner has already started");
+         return;
+      }
+
+      console.log("[JS] Starting miner");
+      var self = this;
+
+      try {
+         await self.updateBlockchain();
+      }
+      catch( e ) {
+         self.updateBlockchainError(e);
+      }
+      await this.awaitInitialization();
+
+      self.startTime = Date.now();
+      let now = Math.floor(Date.now() / 1000);
+      if (now < this.contractStartTime) {
+         let startDateTime = new Date(this.contractStartTime * 1000);
+         console.log("[JS] Mining will begin at " + startDateTime.toLocaleString());
+         this.startTimeout = setTimeout(function() {
+            self.runMiner();
+         }, (this.contractStartTime - now) * 1000);
+      }
+      else {
+         this.runMiner();
+      }
+   }
+
    stop() {
-      this.isStopped = true;
-      if ( this.child !== null) {
+      if (this.child !== null) {
          console.log("[JS] Stopping miner");
          this.child.kill('SIGINT');
          this.child = null;
       }
       else {
          console.log("[JS] Miner has already stopped");
+      }
+
+      if (this.startTimeout !== null) {
+         clearTimeout(this.startTimeout);
+         this.startTimeout = null;
+      }
+
+      console.log("[JS] Stopping blockchain update loop");
+      try {
+         this.updateBlockchainLoop.stop();
+      }
+      catch( e ) {
+         if( e.name === "LooperAlreadyStopping" ) {
+            console.log("[JS] Blockchain update loop was already stopping");
+         }
       }
    }
 
@@ -508,9 +561,9 @@ module.exports = class KoinosMiner {
    async updateLatestBlock() {
       try
       {
-         let headBlock = await this.web3.eth.getBlock("latest");
+         this.headBlock = await this.web3.eth.getBlock("latest");
          // get several blocks behind head block so most reorgs don't invalidate mining
-         let confirmedBlock = await this.web3.eth.getBlock(headBlock.number - 6 );
+         let confirmedBlock = await this.web3.eth.getBlock(this.headBlock.number - 6 );
          this.recentBlock = confirmedBlock;
       }
       catch( e )
