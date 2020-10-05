@@ -65,11 +65,11 @@ var account;
 var w3 = new Web3(program.endpoint);
 
 let warningCallback = function(warning) {
-   console.log(`[JS](app.js) Warning: ` + warning);
+   console.log(`[JS](app.js) Warning: `, warning);
 }
 
 let errorCallback = function(error) {
-   console.log(`[JS](app.js) Error: ` + error);
+   console.log(`[JS](app.js) Error: `, error);
 }
 
 let hashrateCallback = function(hashrate)

@@ -22,6 +22,10 @@ function addressToBytes( addr ) {
    return Buffer.from(addr, "hex");
 }
 
+function sleep(ms) {
+   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 /**
  * A simple queue class for request/response processing.
  *
@@ -166,9 +170,7 @@ module.exports = class KoinosMiner {
             kMessage: "Could not retrieve the PoW height.",
             exception: e
          };
-         if (this.errorCallback && typeof this.errorCallback === "function") {
-            this.errorCallback(error);
-         }
+         throw error;
       }
    }
 
@@ -249,20 +251,42 @@ module.exports = class KoinosMiner {
       return result;
    }
 
-   async updateBlockchain() {
-      let phks = this.getActivePHKs();
-      for( let i=0; i<phks.length; i++ )
-      {
-         await this.retrievePowHeight(phks[i]);
+   async retry(maxRetries, msg, fn) {
+      let tries = 0;
+      while (tries < maxRetries) {
+         try {
+            return await fn();
+         }
+         catch (e) {
+            console.log('[JS] Attempting to ' + msg + ', attempts: ' + (++tries));
+            await sleep(1500);
+            if (tries == maxRetries) {
+               throw e;
+            }
+         }
       }
-      await this.updateLatestBlock();
+   }
+
+   async updateBlockchain() {
+      var self = this;
+      await this.retry(3, "update blockchain data", async function() {
+         let phks = self.getActivePHKs();
+         for( let i=0; i<phks.length; i++ )
+         {
+            await self.retrievePowHeight(phks[i]);
+         }
+         await self.updateLatestBlock();
+      });
    }
 
    updateBlockchainError(e) {
-      let error = {
-         kMessage: "Could not update the blockchain.",
-         exception: e
+      let error = e;
+      if (error.kMessage === undefined) {
+         error = {
+            kMessage: "Could not update the blockchain.",
+            exception: e
          };
+      }
       console.log( "[JS] Exception in updateBlockchainLoop():", e);
       if (this.errorCallback && typeof this.errorCallback === "function") {
          this.errorCallback(error);
@@ -572,9 +596,7 @@ module.exports = class KoinosMiner {
             kMessage: "An error occurred while attempting to retrieve the latest block.",
             exception: e
          };
-         if(this.errorCallback && typeof this.errorCallback === "function") {
-            this.errorCallback(error);
-         }
+         throw error;
       }
    }
 }
