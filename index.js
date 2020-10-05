@@ -259,7 +259,7 @@ module.exports = class KoinosMiner {
          }
          catch (e) {
             tries++;
-            console.log('[JS] Attempting to ' + msg + ', attempts: ' + tries;
+            console.log('[JS] Attempting to ' + msg + ', attempts: ' + tries);
             await sleep(3000);
             if (tries == maxRetries) {
                throw e;
