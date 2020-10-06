@@ -1,7 +1,7 @@
 ![Koinos Miner](assets/images/koinos-cli-miner-banner.png)  
 
-[![GitHub Issues](https://img.shields.io/github/issues/open-orchard/koinos-gui-miner.svg)](https://github.com/open-orchard/koinos-gui-miner/issues)
-[![GitHub License](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://github.com/open-orchard/koinos-gui-miner/blob/master/LICENSE.md)
+[![GitHub Issues](https://img.shields.io/github/issues/open-orchard/koinos-miner.svg)](https://github.com/open-orchard/koinos-miner/issues)
+[![GitHub License](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://github.com/open-orchard/koinos-miner/blob/master/LICENSE.md)
 
 ## License
 
