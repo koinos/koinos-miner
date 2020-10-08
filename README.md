@@ -81,10 +81,18 @@ Options:
 ```
 
 **Recipient Address**: The `--addr` argument specifies the recipient address, this is where KOIN will be rewarded.
+
+**Ethereum Endpoint**: The `--endpoint` argument specifies the Ethereum node to be used when querying contract information and submitting proofs.
+
 **Developer Tip**: The `--tip` argument specifies the percentage to donate to the development team, thank you!
+
 **Proof Period**: The `--proof-period` argument specifies the number of seconds on average the miner will attempt to mine and submit proofs.
+
 **Gas Multiplier**: The `--gas-multiplier` argument specifies a multiplier to apply to the calculated gas price. This can be used to get your proofs submitted when the Ethereum network gas fees are spiking or are unpredictable.
+
 **Gas Price Limit**: The `--gas-price-limit` argument specifies a cap in the acceptable gas price for a proof submission.
+
+A more detailed explanation of the different miner configurations can be found in the [Koinos GUI Miner](https://github.com/open-orchard/koinos-gui-miner) `README.md`.
 
 ## Key Management
 
