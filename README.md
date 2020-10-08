@@ -61,7 +61,7 @@ And get the following output:
 ```
 ❯ npm start -- --help
 
-> koinos-miner@1.0.0 start /Users/sgerbino/Projects/koinos-miner
+> koinos-miner@1.0.0 start /path/to/koinos-miner
 > node app.js "--help"
 
 Usage: app [OPTIONS]...
