@@ -21,7 +21,7 @@ sudo apt install openssl
 
 ### macOS
 
-On macOS, installing `gcc` is required to support OpenMP for parallelization. Using the `brew` package manager, install OpenSSL and gcc.
+On macOS, installing `gcc` is required to support OpenMP parallelization. Using the `brew` package manager, install OpenSSL and gcc.
 ```
 brew install openssl gcc
 ```
@@ -84,7 +84,7 @@ Options:
 
 **Ethereum Endpoint**: The `--endpoint` argument specifies the Ethereum node to be used when querying contract information and submitting proofs.
 
-**Developer Tip**: The `--tip` argument specifies the percentage to donate to the development team, thank you!
+**Developer Tip**: The `--tip` argument specifies the percentage of rewarded KOIN to donate to the development team, thank you!
 
 **Proof Period**: The `--proof-period` argument specifies the number of seconds on average the miner will attempt to mine and submit proofs.
 
