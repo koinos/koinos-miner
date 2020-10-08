@@ -8,6 +8,7 @@
   - [Installation](#installation)
   - [Getting Started](#getting-started)
   - [Key Management](#key-management)
+  - [Example Run](#example-run)
 
 ## Dependencies
 
@@ -97,6 +98,36 @@ A more detailed explanation of the different miner configurations can be found i
 ## Key Management
 
 The CLI miner provides the arguments `--import`, `--export`, and `--key-file`. These are used in handling the private key of the funding address. The user may import a private key and optionally store it in a key file in which case exporting the key is now possible.
+
+## Example Run
+
+A simple example of running the miner:
+
+```
+❯ npm start -- --endpoint http://167.172.118.40:8545 --addr 0x98047645bf61644caa0c24daabd118cc1d640f62 --import
+
+> koinos-miner@1.0.0 start /path/to/koinos-miner
+> node app.js "--endpoint" "http://167.172.118.40:8545" "--addr" "0x98047645bf61644caa0c24daabd118cc1d640f62" "--import"
+
+ _  __     _                   __  __ _
+| |/ /    (_)                 |  \/  (_)
+| ' / ___  _ _ __   ___  ___  | \  / |_ _ __   ___ _ __
+|  < / _ \| | '_ \ / _ \/ __| | |\/| | | '_ \ / _ \ '__|
+| . \ (_) | | | | | (_) \__ \ | |  | | | | | |  __/ |
+|_|\_\___/|_|_| |_|\___/|___/ |_|  |_|_|_| |_|\___|_|
+
+[JS](app.js) Mining with the following arguments:
+[JS](app.js) Ethereum Address: 0x98047645bf61644caa0c24daabd118cc1d640f62
+[JS](app.js) Ethereum Endpoint: http://167.172.118.40:8545
+[JS](app.js) Developer Tip: 5%
+[JS](app.js) Proof Period: 86400
+
+Enter private key:
+Reinput a same one to confirm it:
+Do you want to store your private key encrypted on disk? [y/n]: n
+Imported Ethereum address: 0x98047645BF61644CAA0c24dAABD118cC1D640F62
+[JS] Starting miner
+```
 
 ## License
 
