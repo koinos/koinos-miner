@@ -24,12 +24,12 @@ sudo apt install openssl
 
 On macOS, installing `gcc` is required to support OpenMP parallelization. Using the `brew` package manager, install OpenSSL and gcc.
 ```
-brew install openssl gcc
+brew install openssl gcc cmake
 ```
 
 ### Windows
 
-On Windows, ensure that you are using the `MingW` compiler. Using the cholocately package manager, install OpenSSL.
+On Windows, ensure that you are using the `MingW` compiler and you have installed `CMake`. Using the cholocately package manager, install OpenSSL.
 
 ```
 choco install openssl
