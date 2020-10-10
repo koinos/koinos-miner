@@ -4,11 +4,12 @@
 [![GitHub License](https://img.shields.io/badge/license-GPLv3-blue.svg)](https://github.com/open-orchard/koinos-miner/blob/master/LICENSE.md)
 
 ## Table of Contents
-  - [Dependencies](#dependencies)
-  - [Installation](#installation)
-  - [Getting Started](#getting-started)
-  - [Key Management](#key-management)
-  - [Example Run](#example-run)
+
+-   [Dependencies](#dependencies)
+-   [Installation](#installation)
+-   [Getting Started](#getting-started)
+-   [Key Management](#key-management)
+-   [Example Run](#example-run)
 
 ## Dependencies
 
@@ -23,6 +24,7 @@ sudo apt-get install git cmake build-essential libssl-dev
 ### macOS
 
 On macOS, installing `gcc` is required to support OpenMP parallelization. Using the `brew` package manager, install OpenSSL and gcc.
+
 ```
 brew install openssl gcc cmake
 ```
@@ -140,8 +142,8 @@ the Free Software Foundation, either version 3 of the License, or
 
 Koinos Miner is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with Koinos Miner.  If not, see <https://www.gnu.org/licenses/>.
+along with Koinos Miner. If not, see <https://www.gnu.org/licenses/>.
