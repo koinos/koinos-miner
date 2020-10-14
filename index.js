@@ -6,6 +6,7 @@ const os = require('os');
 const abi = require('./abi.js');
 const crypto = require('crypto');
 const {Looper} = require("./looper.js");
+const Retry = require("./retry.js");
 
 function difficultyToString( difficulty ) {
    let difficultyStr = difficulty.toString(16);
@@ -20,10 +21,6 @@ function addressToBytes( addr ) {
       addr = addr.substring(2);
    addr = "0".repeat(ADDRESS_LENGTH - addr.length) + addr;
    return Buffer.from(addr, "hex");
-}
-
-function sleep(ms) {
-   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**
@@ -251,26 +248,9 @@ module.exports = class KoinosMiner {
       return result;
    }
 
-   async retry(maxRetries, msg, fn) {
-      let tries = 0;
-      while (tries < maxRetries) {
-         try {
-            return await fn();
-         }
-         catch (e) {
-            tries++;
-            console.log('[JS] Attempting to ' + msg + ', attempts: ' + tries);
-            await sleep(3000);
-            if (tries == maxRetries) {
-               throw e;
-            }
-         }
-      }
-   }
-
    async updateBlockchain() {
       var self = this;
-      await this.retry(3, "update blockchain data", async function() {
+      await Retry("update blockchain data", async function() {
          let phks = self.getActivePHKs();
          for( let i=0; i<phks.length; i++ )
          {
