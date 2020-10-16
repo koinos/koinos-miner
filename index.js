@@ -314,7 +314,7 @@ module.exports = class KoinosMiner {
 
       const gasPrice = await this.getGasPrice();
       // If error happens, an object is returned, otherwise a number
-      if(typeof gasPrice === object || gasPrice.kMessage) {
+      if(typeof gasPrice === 'object' || gasPrice.kMessage) {
          this.errorCallback(gasPrice);
       }
 
@@ -387,7 +387,7 @@ module.exports = class KoinosMiner {
       // user sets gwei limit => use gwei limit
       // user doesn't set anything => use gwei limit (gwei is easier to read)
 
-      if ((!isDefaultSettings || wasGweiLimitModified) && gwei > gweiLimit) {
+      if ((isDefaultSettings || wasGweiLimitModified) && gwei > gweiLimit) {
          console.log(`[GAS] Gwei limit reached: (${gwei} | ${gweiLimit})`);
          let error = {
             kMessage: "The gwei price (" + gwei + ") has exceeded the gwei price limit (" + gweiLimit + ")."
