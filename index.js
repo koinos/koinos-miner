@@ -354,7 +354,7 @@ module.exports = class KoinosMiner {
       if(this.speed) {
          try {
             const {data} = await axios.get('https://fees.upvest.co/estimate_eth_fees'); 
-            speedGwei = data.estimates[this.speed] || data.estimates[DEFAULT_SPEED];
+            speedGwei = Math.round(data.estimates[this.speed] || data.estimates[DEFAULT_SPEED]);
             console.log(`[GAS] Estimated ${this.speed || DEFAULT_SPEED} gas price: ${speedGwei} Gwei`);
          } catch (error) {
             console.error('axios', error);
