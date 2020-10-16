@@ -130,7 +130,7 @@ function decrypt(cipherText, password)
    return decrypted
 }
 
-if(program.useEnv) {
+if(!program.import && program.useEnv) {
    if(!process.env.privateKey) {
       console.log(`Can't find privateKey within .env file.`);
       process.exit(0);
