@@ -49,6 +49,14 @@ For macOS, you will need to specify the C compiler as `gcc`.
 CC=gcc-10 npm install
 ```
 
+For macOS, you also might need to set the correct openssl directory:
+
+```
+#1: Find your local ssl path (example: /usr/local/Cellar/openssl@1.1 or /usr/local/Cellar/openssl)
+#2: Open package.json, change "postinstall" to "postinstall:other" and "postinstall:osx" to "postinstall"
+#3: Look at "postinstall" and change the ssl paths for "DOPENSSL_ROOT_DIR" and "DOPENSSL_LIBRARIES". The second path is the same as the first just with "/lib" at the end
+```
+
 ## Getting started
 
 You can view the CLI miner arguments by using `npm` like so:
@@ -76,7 +84,12 @@ Options:
   -k, --key-file <file>              AES encrypted file containing private key
   -m, --gas-multiplier <multiplier>  The multiplier to apply to the recommended gas price (default: "1")
   -l, --gas-price-limit <limit>      The maximum amount of gas to be spent on a proof submission (default: "1000000000000")
+  -l, --gwei-limit <limit>           The maximum amount of gas in gwei unit to be spent on a proof submission (default: "1000")
+  -l, --gwei-minimum <minimum>       The minimum amount of gas in gwei unit to be spent on a proof submission (default: "25")
+  -s, --speed <speed>                How fast should the transaction be: slow | medium | fast | fastest (default: "medium")
+                                     (https://fees.upvest.co/estimate_eth_fees)`
   --import                           Import a private key
+  --use-env                          Use private key from .env file (privateKey=YOUR_PRIVATE_KEY)
   --export                           Export a private key
   -h, --help                         display help for command
 ```
@@ -93,11 +106,25 @@ Options:
 
 **Gas Price Limit**: The `--gas-price-limit` argument specifies a cap in the acceptable gas price for a proof submission.
 
+**Gwei Limit**: The `--gwei-limit` argument specifies a cap in the acceptable gas price (in gwei unit) for a proof submission.
+
+**Gwei Minimum**: The `--gwei-minimum` argument specifies the minimum amount of gas (in gwei unit) to be paid for a proof submission.
+
+Info: `--gwei-limit` and `--gwei-minimum` were added later to make it easier, as gwei prices are simpler to read. To provide backwards compatability, `--gas-price-limit` is still supported and will be used if `--gwei-limit` is not set. However, `--gas-price-limit` is recommended.
+
+1 Gwei = 1000000000 Gas (https://eth-converter.com/)
+
 A more detailed explanation of the different miner configurations can be found in the [Koinos GUI Miner](https://github.com/open-orchard/koinos-gui-miner) `README.md`.
 
 ## Key Management
 
 The CLI miner provides the arguments `--import`, `--export`, and `--key-file`. These are used in handling the private key of the funding address. The user may import a private key and optionally store it in a key file in which case exporting the key is now possible.
+
+If you know what you're doing, you can also use `--use-env` to get the key from an `.env` file:
+
+```
+echo privateKey=YOUR_PRIVATE_KEY | tee .env
+```
 
 ## Example Run
 

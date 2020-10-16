@@ -2,6 +2,8 @@
 
 const { program } = require('commander');
 
+require('dotenv').config();
+
 program
    .version('1.0.0', '-v, --version')
    .usage('[OPTIONS]...')
@@ -11,9 +13,13 @@ program
    .option('-p, --proof-period <seconds>', 'How often you want to submit a proof on average', '86400')
    .option('-k, --key-file <file>', 'AES encrypted file containing private key')
    .option('-m, --gas-multiplier <multiplier>', 'The multiplier to apply to the recommended gas price', '1')
+   .option('-g, --gwei-limit <limit>', 'The maximum amount of gas in gwei unit to be spent on a proof submission', '1000')
+   .option('-b, --gwei-minimum <limit>', 'The minimum amount of gas in gwei unit to be spent on a proof submission', '25')
+   .option('-s, --speed <speed>', `How fast should the transaction be: slow | medium | fast | fastest (https://fees.upvest.co/estimate_eth_fees)`)
    .option('-l, --gas-price-limit <limit>', 'The maximum amount of gas to be spent on a proof submission', '1000000000000')
    .option('--import', 'Import a private key')
    .option('--export', 'Export a private key')
+   .option('--use-env', 'Use private key from .env file (privateKey=YOUR_PRIVATE_KEY)')
    .parse(process.argv);
 
 console.log(` _  __     _                   __  __ _`);
@@ -124,7 +130,15 @@ function decrypt(cipherText, password)
    return decrypted
 }
 
-if (program.import)
+if(program.useEnv) {
+   if(!process.env.privateKey) {
+      console.log(`Can't find privateKey within .env file.`);
+      process.exit(0);
+   }
+   account = w3.eth.accounts.privateKeyToAccount(process.env.privateKey);
+   console.log('Imported Ethereum address: ' + account.address);
+}
+else if (program.import)
 {
    account = w3.eth.accounts.privateKeyToAccount(
       readlineSync.questionNewPassword('Enter private key: ', {
@@ -190,6 +204,9 @@ var miner = new KoinosMiner(
    program.proofPeriod,
    program.gasMultiplier,
    program.gasPriceLimit,
+   program.gweiLimit,
+   program.gweiMinimum,
+   program.speed,
    signCallback,
    hashrateCallback,
    proofCallback,

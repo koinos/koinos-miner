@@ -7,6 +7,10 @@ const abi = require('./abi.js');
 const crypto = require('crypto');
 const {Looper} = require("./looper.js");
 const Retry = require("./retry.js");
+const axios = require('axios')
+
+const GWEI_UNIT = 1000000000
+const DEFAULT_SPEED = 'medium'
 
 function difficultyToString( difficulty ) {
    let difficultyStr = difficulty.toString(16);
@@ -79,7 +83,7 @@ module.exports = class KoinosMiner {
    child = null;
    contract = null;
 
-   constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, signCallback, hashrateCallback, proofCallback, errorCallback, warningCallback) {
+   constructor(address, tipAddresses, fromAddress, contractAddress, endpoint, tipAmount, period, gasMultiplier, gasPriceLimit, gweiLimit, gweiMinimum, speed, signCallback, hashrateCallback, proofCallback, errorCallback, warningCallback) {
       let self = this;
 
       this.address = address;
@@ -94,6 +98,9 @@ module.exports = class KoinosMiner {
       this.fromAddress = fromAddress;
       this.gasMultiplier = gasMultiplier;
       this.gasPriceLimit = gasPriceLimit;
+      this.gweiLimit = gweiLimit
+      this.gweiMinimum = gweiMinimum
+      this.speed = speed
       this.contractAddress = contractAddress;
       this.proofCallback = proofCallback;
       this.updateBlockchainLoop = new Looper(
@@ -250,6 +257,7 @@ module.exports = class KoinosMiner {
 
    async updateBlockchain() {
       var self = this;
+      const gasPrice = await this.getGasPrice()
       await Retry("update blockchain data", async function() {
          let phks = self.getActivePHKs();
          for( let i=0; i<phks.length; i++ )
@@ -304,15 +312,10 @@ module.exports = class KoinosMiner {
          "0x" + nonce.toString(16)
       ];
 
-      let gasPrice = Math.round(parseInt(await this.web3.eth.getGasPrice()) * this.gasMultiplier);
-
-      if (gasPrice > this.gasPriceLimit) {
-         let error = {
-            kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + this.gasPriceLimit + ")."
-         };
-         if (this.errorCallback && typeof this.errorCallback === "function") {
-            this.errorCallback(error);
-         }
+      const gasPrice = await this.getGasPrice();
+      // If error happens, an object is returned, otherwise a number
+      if(typeof gasPrice === object || gasPrice.kMessage) {
+         this.errorCallback(gasPrice);
       }
 
       this.sendTransaction({
@@ -327,6 +330,84 @@ module.exports = class KoinosMiner {
       this.adjustDifficulty();
       this.startTime = Date.now();
       this.sendMiningRequest();
+   }
+
+   async getGasPrice() {
+      const gweiMinimum = Number(this.gweiMinimum)
+      const gweiLimit = Number(this.gweiLimit)
+      const gasPriceLimit = Number(this.gasPriceLimit)
+
+      // get current gas price from network
+      let gasPrice = parseInt(await this.web3.eth.getGasPrice());
+
+      // convert it to gwei
+      let gwei = gasPrice / GWEI_UNIT;
+      console.log(`[GAS] Received gas price: ${gwei} Gwei`)
+
+      // multiply and round
+      gwei = Math.round(gwei * this.gasMultiplier);
+      console.log(`[GAS] Multiplied gas price to: ${gwei} Gwei`);
+
+      let speedGwei = gweiMinimum
+
+      // get speed prices from upvest api
+      if(this.speed) {
+         try {
+            const {data} = await axios.get('https://fees.upvest.co/estimate_eth_fees'); 
+            speedGwei = data.estimates[this.speed] || data.estimates[DEFAULT_SPEED];
+            console.log(`[GAS] Estimated ${this.speed || DEFAULT_SPEED} gas price: ${speedGwei} Gwei`);
+         } catch (error) {
+            console.error('axios', error);
+         }
+      }
+
+      // if the speed gwei price is bigger than gwei, use that instead
+      if(speedGwei && speedGwei > gwei) {
+         console.log(`[GAS] Using ${this.speed || DEFAULT_SPEED} gas price of ${speedGwei} Gwei (vs. ${gwei} Gwei)`)
+         gwei = speedGwei;
+      }
+
+      // check whether gasPrice was empty or it's below the set minimum, if yes => set gwei to minimum
+      if(!gwei || gwei < gweiMinimum) {
+         gwei = gweiMinimum;
+         console.log(`[GAS] Gas price is below minimum - set to: ${gwei} Gwei`);
+      }
+
+      // convert gwei back to gasPrice
+      gasPrice = gwei * GWEI_UNIT;
+
+      const wasGasPriceLimitModified = Boolean(gasPriceLimit !== 1000000000000);
+      const wasGweiLimitModified = Boolean(gweiLimit !== 1000);
+      const isDefaultSettings = !wasGasPriceLimitModified && !wasGweiLimitModified;
+
+      // Logic:
+      // user sets gas limit => use gas limit
+      // gwei limit is added to code
+      // user doesn't set gwei limit => use gas limit
+      // user sets gwei limit => use gwei limit
+      // user doesn't set anything => use gwei limit (gwei is easier to read)
+
+      if ((!isDefaultSettings || wasGweiLimitModified) && gwei > gweiLimit) {
+         console.log(`[GAS] Gwei limit reached: (${gwei} | ${gweiLimit})`);
+         let error = {
+            kMessage: "The gwei price (" + gwei + ") has exceeded the gwei price limit (" + gweiLimit + ")."
+         };
+         if (this.errorCallback && typeof this.errorCallback === "function") {
+            return error
+         }
+      }
+      
+      if (gasPrice > gasPriceLimit) {
+         console.log(`[GAS] Gas limit reached: (${gasPrice} | ${gasPriceLimit})`);
+         let error = {
+            kMessage: "The gas price (" + gasPrice + ") has exceeded the gas price limit (" + gasPriceLimit + ")."
+         };
+         if (this.errorCallback && typeof this.errorCallback === "function") {
+            return error
+         }
+      }
+
+      return gasPrice
    }
 
    async onRespHashReport( req, newHashes )
