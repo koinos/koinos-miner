@@ -35,10 +35,11 @@ if(MINGW)
      set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,-Bstatic,--whole-archive -lwinpthread -Wl,--no-whole-archive")
 endif()
 
-SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pthread -fopenmp -static-libgcc")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -I/usr/local/opt/openssl/include -pthread -fopenmp -static-libgcc")
 
 if(APPLE)
    SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_GNU_SOURCE")
+   SET(OPENSSL_ROOT_DIR "/usr/local/opt/openssl")
 endif()
 
 if(${CMAKE_GENERATOR} MATCHES "Xcode")
