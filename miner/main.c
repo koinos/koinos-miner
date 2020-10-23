@@ -524,7 +524,7 @@ int main( int argc, char** argv )
                   }
                   else
                   {
-                     #pragma omp crticial
+                     #pragma omp critical
                      {
                         // Two threads could find a valid proof at the same time (unlikely, but possible).
                         // We want to return the more difficult proof
