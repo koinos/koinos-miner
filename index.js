@@ -281,7 +281,7 @@ module.exports = class KoinosMiner {
       this.sendMiningRequest();
    }
 
-   async onRespNonce(req, nonce) {
+   async onRespNonce(req, nonce, difficulty) {
       console.log( "[JS] Nonce: " + nonce );
       this.endTime = Date.now();
       var delta = this.endTime - this.lastProof;
@@ -299,7 +299,7 @@ module.exports = class KoinosMiner {
          [10000-req.tipAmount,req.tipAmount],
          req.block.number,
          req.block.hash,
-         difficultyToString( req.difficulty ),
+         difficultyToString( difficulty ),
          req.powHeight,
          "0x" + nonce.toString(16)
       ];
@@ -359,8 +359,11 @@ module.exports = class KoinosMiner {
             await self.onRespFinished(self.miningQueue.popHead());
          }
          else if ( self.isFinishedWithNonce(data) ) {
-            let nonce = BigInt('0x' + self.getValue(data));
-            await self.onRespNonce(self.miningQueue.popHead(), nonce);
+            const values = self.getValue(data);
+            const nonce = BigInt('0x' + values[0]);
+            const difficulty = BigInt('0x' + values[1]);
+
+            await self.onRespNonce(self.miningQueue.popHead(), nonce, difficulty);
          }
          else if ( self.isHashReport(data) ) {
             let ret = self.getValue(data).split(" ");
@@ -452,7 +455,11 @@ module.exports = class KoinosMiner {
 
    getValue(s) {
       let str = s.toString();
-      return str.substring(2, str.indexOf(";"));
+      let values = str.split(";");
+      values[0] = values[0].substring(2);
+      if(values.length === 2)
+        return values[0];
+      return values;
    }
 
    isFinishedWithoutNonce(s) {
