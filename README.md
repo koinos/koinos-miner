@@ -71,7 +71,7 @@ Usage: app [OPTIONS]...
 Options:
   -v, --version                      output the version number
   -a, --addr <addr>                  An ethereum address
-  -e, --endpoint <endpoint>          An ethereum endpoint (default: "wss://ropsten-rpc.linkpool.io/ws")
+  -e, --endpoint <endpoint>          An ethereum endpoint (default: "http://mining.koinos.io")
   -t, --tip <percent>                The percentage of mined coins to tip the developers (default: "5")
   -p, --proof-period <seconds>       How often you want to submit a proof on average (default: "86400")
   -k, --key-file <file>              AES encrypted file containing private key
