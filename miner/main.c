@@ -514,7 +514,7 @@ int main( int argc, char** argv )
             {
                work( &t_result, &secured_struct_hash, &t_nonce, word_buffer );
 
-               if( bignum_cmp( &t_result, &ss.target ) <= 0)
+               if( bignum_cmp( &t_result, &ss.target ) < 0)
                {
                   if( !words_are_unique( &secured_struct_hash, &t_nonce, word_buffer ) )
                   {
