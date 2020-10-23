@@ -86,12 +86,7 @@ let signCallback = async function(web3, txData)
 
 function enterPassword()
 {
-  if ('KOINOS_PK_PASS' in process.env) {
-    return process.env.KOINOS_PK_PASS;
-  } else {
-    return readlineSync.questionNewPassword('Enter password for encryption: ', {mask: ''});
-  }
-   
+   return readlineSync.questionNewPassword('Enter password for encryption: ', {mask: ''});
 }
 
 function encrypt(data, password)
