@@ -558,11 +558,11 @@ int main( int argc, char** argv )
       }
       else
       {
+         bignum_inc( &result );
          bignum_to_string( &nonce, bn_str, sizeof(bn_str), false );
          bignum_to_string( &result, bn_str2, sizeof(bn_str2), false );
          fprintf( stdout, "N:%s;%s;\n", bn_str , bn_str2);
-
-         fprintf(stderr, "[C] Nonce: %s\n", bn_str);
+         fprintf(stderr, "[C] Nonce: %s; Difficulty: %s\n", bn_str, bn_str2);
          fflush(stderr);
       }
 
