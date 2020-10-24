@@ -1,12 +1,13 @@
 {
   "name": "koinos-miner",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Mining application used to mint the KOIN ERC-20.",
   "main": "index.js",
   "scripts": {
     "start": "node app.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "postinstall": "rm -rf build && mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build"
+    "postinstall": "rm -rf build && mkdir build && cd build && cmake -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build",
+    "postinstall:osx": "rm -rf build && mkdir build && cd build && cmake -DOPENSSL_ROOT_DIR=/usr/local/Cellar/openssl@1.1/1.1.1h -DOPENSSL_LIBRARIES=/usr/local/Cellar/openssl@1.1/1.1.1h/lib -DCMAKE_INSTALL_PREFIX=.. -DCMAKE_BUILD_TYPE=Release .. && cmake --build . --target install --config Release && cd .. && rm -rf build"
   },
   "repository": {
     "type": "git",
@@ -20,7 +21,9 @@
   },
   "homepage": "https://github.com/open-orchard/koinos-miner#readme",
   "dependencies": {
+    "axios": "^0.20.0",
     "commander": "^6.0.0",
+    "dotenv": "^8.2.0",
     "readline-sync": "^1.4.10",
     "web3": "^1.2.11"
   }
