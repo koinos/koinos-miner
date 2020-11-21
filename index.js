@@ -496,15 +496,17 @@ module.exports = class KoinosMiner {
 
    static formatHashrate(h) {
       var units = ""
+      var padding0 = (x) => ("0".repeat(3 - x.toString().length) + x);
+
       switch( Math.trunc(Math.log10(h) / 3) ) {
          case 0:
             return h + " H/s"
          case 1:
-            return Math.trunc(h/ 1000) + "." + Math.trunc(h % 1000) + " KH/s"
+            return Math.trunc(h/ 1000) + "." + padding0(Math.trunc(h % 1000)) + " KH/s"
          case 2:
-            return Math.trunc(h/ 1000000) + "." + Math.trunc((h / 1000) % 1000) + " MH/s"
+            return Math.trunc(h/ 1000000) + "." + padding0(Math.trunc((h / 1000) % 1000)) + " MH/s"
          default:
-            return Math.trunc(h/ 1000000000) + "." + Math.trunc((h / 1000000) % 1000) + " GH/s"
+            return Math.trunc(h/ 1000000000) + "." + padding0(Math.trunc((h / 1000000) % 1000)) + " GH/s"
       }
    }
 
